@@ -82,6 +82,17 @@
             <main class="flex-1 overflow-y-auto pb-24 px-4 py-4" ref="mainScroll">
                 
                 <div v-if="currentTab==='staff-home' && !viewingChatId">
+                    <div v-if="absenceShifts.length > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl shadow-sm mb-6 animate-pulse">
+                        <h3 class="font-bold text-red-600 dark:text-red-400 mb-2"><i class="fa-solid fa-triangle-exclamation"></i> 欠勤・遅刻の連絡</h3>
+                        <div v-for="shift in absenceShifts" :key="shift.id" class="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm mb-2 border-l-4 border-red-500">
+                            <div class="flex justify-between font-bold"><span>{{ shift.castName }}</span><span class="text-red-500">欠勤</span></div>
+                            <div class="text-xs text-gray-500 mt-1">{{ formatDate(shift.date) }}</div>
+                            <div class="flex gap-2 mt-2">
+                                <button @click="updateShift(shift,'承認済み')" class="flex-1 bg-red-500 text-white py-2 rounded text-xs font-bold">確認 (承認)</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-4">
                         <h3 class="font-bold text-gray-500 dark:text-gray-400 mb-2"><i class="fa-solid fa-calendar-check mr-2"></i>本日の出勤 ({{ todayShifts.length }}名)</h3>
                         <div v-if="todayShifts.length===0" class="text-xs text-gray-400 text-center py-2">出勤予定はありません</div>
@@ -112,6 +123,27 @@
                         <div class="text-xs mb-2 bg-blue-50 text-blue-600 px-2 py-1 rounded inline-block">{{ shift.type }} {{ shift.startTime }}-{{ shift.endTime }}</div>
                         <div v-if="shift.note" class="text-xs text-gray-500 bg-gray-50 p-2 rounded mb-2">{{ shift.note }}</div>
                         <div class="flex gap-2"><button @click="updateShift(shift,'却下')" class="flex-1 bg-gray-100 text-red-500 py-2 rounded text-xs font-bold">却下</button><button @click="updateShift(shift,'承認済み')" class="flex-1 bg-blue-600 text-white py-2 rounded text-xs font-bold">承認</button></div>
+                    </div>
+                </div>
+
+                <div v-if="currentTab==='staff-calendar' && !viewingChatId">
+                    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-4">
+                        <h3 class="text-center font-bold mb-4">{{ new Date().getFullYear() }}年 {{ new Date().getMonth()+1 }}月</h3>
+                        <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs text-gray-400"><span>日</span>...<span>土</span></div>
+                        <div class="grid grid-cols-7 gap-2">
+                            <div v-for="day in calendarDays" :key="day" @click="selectManagerDate(day)" class="aspect-square flex flex-col items-center justify-center rounded-lg border relative" :class="isSameDay(day,selectedManagerDate)?'border-blue-500 bg-blue-50 dark:bg-blue-900/30':'border-transparent bg-gray-50 dark:bg-gray-700'">
+                                <span class="text-sm">{{ new Date(day).getDate() }}</span>
+                                <div v-if="getStaffCount(day)>0" class="mt-1 flex items-center justify-center bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ getStaffCount(day) }}人</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 min-h-[200px]">
+                        <h4 class="font-bold text-lg mb-4 border-b pb-2">{{ formatDate(selectedManagerDate) }} の出勤</h4>
+                        <div v-if="getDailyShifts(selectedManagerDate).length===0" class="text-gray-400 text-center py-4">出勤予定はありません</div>
+                        <div v-for="s in getDailyShifts(selectedManagerDate)" :key="s.id" class="flex justify-between items-center py-3 border-b dark:border-gray-700 last:border-0">
+                            <div class="font-bold">{{ s.castName }}</div>
+                            <div class="text-sm bg-blue-50 text-blue-600 px-2 py-1 rounded">{{ s.startTime }} - {{ s.endTime }}</div>
+                        </div>
                     </div>
                 </div>
 
@@ -163,7 +195,6 @@
                             <div v-for="day in calendarDays" :key="day" @click="selectDate(day)" class="aspect-square flex flex-col items-center justify-center rounded-lg border relative" :class="isSameDay(day,selectedDate)?'border-pink-500 bg-pink-50 dark:bg-pink-900/30':'border-transparent bg-gray-50 dark:bg-gray-700'">
                                 <span class="text-sm">{{ new Date(day).getDate() }}</span>
                                 <div class="h-1 mt-1"><div v-if="getShift(day)" class="w-1.5 h-1.5 rounded-full" :class="getShiftColor(getShift(day))"></div></div>
-                                <div v-if="!activeCast && getStaffCount(day)>0" class="absolute bottom-0 right-0 text-[8px] bg-blue-100 text-blue-600 px-1 rounded-tl">{{ getStaffCount(day) }}人</div>
                             </div>
                         </div>
                     </div>
@@ -218,6 +249,12 @@
                             </div>
                         </div>
                         
+                        <div v-if="!activeCast" class="mb-4">
+                            <label class="text-xs font-bold text-gray-500">通知用メールアドレス</label>
+                            <input v-model="storeData.storeEmail" @change="updateStore({storeEmail:storeData.storeEmail})" placeholder="欠勤連絡を受け取るアドレス" class="w-full p-2 border rounded dark:bg-gray-700 text-sm mt-1">
+                            <p class="text-[10px] text-gray-400 mt-1">※ここに入力すると、キャストからの欠勤連絡がメールで届きます。</p>
+                        </div>
+
                         <div v-if="activeCast" class="p-4 border-t dark:border-gray-700 space-y-4">
                             <div class="flex justify-between items-center"><span class="text-sm font-bold">給与概算を表示</span><button @click="toggleSalaryDisplay" class="w-10 h-5 bg-gray-300 rounded-full relative" :class="{'bg-green-500':activeCast.settings?.showSalary}"><div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-all" :class="{'left-6':activeCast.settings?.showSalary}"></div></button></div>
                             <div v-if="activeCast.settings?.showSalary"><label class="text-xs text-gray-500">基本時給</label><div class="flex items-center gap-2"><input type="number" v-model="activeCast.settings.hourlyRate" @change="saveCastSettings" class="p-2 border rounded w-24 bg-gray-50 dark:bg-gray-700 text-right"><span class="text-sm">円</span></div></div>
@@ -239,6 +276,7 @@
             <nav v-if="!viewingChatId" class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 safe-area-bottom px-6 py-2 flex justify-between text-xs text-gray-400 z-20">
                 <template v-if="!activeCast">
                     <button @click="currentTab='staff-home'" :class="{'text-blue-600':currentTab==='staff-home'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-house text-xl"></i>ホーム</button>
+                    <button @click="currentTab='staff-calendar'" :class="{'text-blue-600':currentTab==='staff-calendar'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-calendar-days text-xl"></i>シフト</button>
                     <button @click="currentTab='messages'" :class="{'text-blue-600':currentTab==='messages'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-message text-xl"></i>トーク</button>
                     <button @click="currentTab='staff-casts'" :class="{'text-blue-600':currentTab==='staff-casts'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-users text-xl"></i>キャスト</button>
                     <button @click="currentTab='settings'" :class="{'text-blue-600':currentTab==='settings'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-gear text-xl"></i>設定</button>
@@ -259,7 +297,6 @@
             <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl">
                 <div class="text-xs text-gray-400 mb-2">{{ formatDate(selectedNews.date) }}</div>
                 <div class="whitespace-pre-wrap font-medium mb-6 dark:text-gray-100 max-h-[50vh] overflow-y-auto">{{ selectedNews.text }}</div>
-                
                 <div v-if="activeCast">
                     <button v-if="!selectedNews.readBy?.includes(activeCast.id)" @click="confirmNews" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg">確認しました</button>
                     <button v-else class="w-full bg-gray-200 dark:bg-gray-700 text-gray-500 font-bold py-3 rounded-xl" disabled>確認済み</button>
@@ -268,14 +305,7 @@
             </div>
         </div>
 
-        <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
-                <h3 class="font-bold mb-2">{{ qrTargetName }}</h3>
-                <p class="text-xs text-gray-400 mb-4">このQRコードを読み取ってログイン</p>
-                <div class="flex justify-center mb-4"><img :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`" alt="QR Code" class="border rounded p-2 bg-white"></div>
-                <button @click="showQRModal=false" class="py-2 px-6 bg-blue-600 text-white rounded-lg">閉じる</button>
-            </div>
-        </div>
+        <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center"><h3 class="font-bold mb-2">{{ qrTargetName }}</h3><p class="text-xs text-gray-400 mb-4">このQRコードを読み取ってログイン</p><div class="flex justify-center mb-4"><img :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`" alt="QR Code" class="border rounded p-2 bg-white"></div><button @click="showQRModal=false" class="py-2 px-6 bg-blue-600 text-white rounded-lg">閉じる</button></div></div>
         <div v-if="showHelpModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl h-[70vh] flex flex-col"><h3 class="font-bold mb-4">{{ showHelpModal==='terms'?'利用規約':'使い方ガイド' }}</h3><div class="flex-1 overflow-y-auto text-sm space-y-3 text-gray-600 dark:text-gray-300"><template v-if="showHelpModal==='terms'"><p>1. 本アプリはベータ版です。データの消失等について責任を負いません。</p><p>2. 入力されたデータはFirebase(Google)に保存されます。</p><p>3. アカウント情報は適切に管理してください。</p></template><template v-else><p><strong>【店舗管理者】</strong><br>・キャストを追加してID/QRを渡してください。<br>・シフトの承認/却下ができます。</p><p><strong>【キャスト】</strong><br>・カレンダーから希望シフトを提出します。<br>・「設定」で時給を登録すると給与目安が出ます。</p></template></div><button @click="showHelpModal=null" class="mt-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-lg">閉じる</button></div></div>
 
     </div>
@@ -286,7 +316,14 @@
         import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
-        const emailConfig = { publicKey: "pBXsfa-38OMNK1E6b", serviceId: "service_71f25g6", templateId: "template_675u7wq" };
+        
+        // ★★★ 下の templateId を新しいものに書き換えてください ★★★
+        const emailConfig = { 
+            publicKey: "pBXsfa-38OMNK1E6b", 
+            serviceId: "service_71f25g6", 
+            templateId: "template_675u7wq", // 登録用 (既存)
+            notificationTemplateId: "template_xxxxx" // ← 通知用 (新しく作って書き換える)
+        };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -309,23 +346,17 @@
                 const currentStoreDocId = ref(null);
                 const currentCastId = ref(null);
                 const selectedDate=ref(new Date().toISOString().split('T')[0]);
+                const selectedManagerDate=ref(new Date().toISOString().split('T')[0]); // 店長カレンダー用
                 const editingShift=reactive({type:'出勤',startTime:'20:00',endTime:'25:00',note:'', backs:{}});
                 const showAnnouncementModal=ref(false); const newAnnouncementText=ref('');
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
                 const newBackName=ref(''); const newBackPrice=ref('');
                 const showQRModal=ref(false); const qrUrl=ref(''); const qrTargetName=ref('');
                 const showHelpModal=ref(null); const isFirstRun = ref(false);
-                
-                // お知らせ関連
                 const selectedNews = ref(null);
 
-                // --- Helper Functions ---
-                const generateRandomId = (prefix, length) => {
-                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                    let result = '';
-                    for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-                    return prefix + result;
-                };
+                // Helper Functions
+                const generateRandomId = (prefix, length) => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = ''; for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length)); return prefix + result; };
                 const generateRandomPass = () => Math.random().toString(36).slice(-8);
 
                 let unsubscribe = null;
@@ -338,236 +369,120 @@
                         }
                     });
                 };
-                const checkFirstRun = async () => {
-                    const q = query(collection(db, "stores"));
-                    const snap = await getDocs(q);
-                    isFirstRun.value = snap.empty;
-                    isLoading.value = false;
-                };
+                const checkFirstRun = async () => { const q = query(collection(db, "stores")); const snap = await getDocs(q); isFirstRun.value = snap.empty; isLoading.value = false; };
 
                 onMounted(async () => {
                     const params = new URLSearchParams(window.location.search);
-                    const sId = params.get('store');
-                    const cCode = params.get('code');
+                    const sId = params.get('store'); const cCode = params.get('code');
                     if(sId && cCode) {
                         isLoading.value = true;
                         const q = query(collection(db, "stores"), where("storeDisplayId", "==", sId));
                         const snap = await getDocs(q);
                         if(!snap.empty) {
-                            const d = snap.docs[0];
-                            const data = d.data();
-                            const cast = data.casts.find(c => c.code === cCode);
-                            if(cast) {
-                                currentStoreDocId.value = d.id;
-                                currentCastId.value = cast.id;
-                                subscribeToStore(d.id);
-                                isLoggedIn.value = true;
-                                currentTab.value = 'cast-calendar';
-                                window.history.replaceState(null, '', window.location.pathname);
-                            }
+                            const d = snap.docs[0]; const data = d.data(); const cast = data.casts.find(c => c.code === cCode);
+                            if(cast) { currentStoreDocId.value = d.id; currentCastId.value = cast.id; subscribeToStore(d.id); isLoggedIn.value = true; currentTab.value = 'cast-calendar'; window.history.replaceState(null, '', window.location.pathname); }
                         }
                     }
                     checkFirstRun();
                 });
 
-                // Updates & Sync
                 const updateStore = async (data) => { if(currentStoreDocId.value) await updateDoc(doc(db, "stores", currentStoreDocId.value), data); };
-
-                // Read Receipt Logic (DB Update)
                 const markChatRead = async () => {
                     if(!storeData.value.messages) return;
                     let needsUpdate = false;
                     const newMessages = storeData.value.messages.map(m => {
-                        // Cast viewing messages from manager
-                        if(activeCast.value && !m.isSenderCast && !m.isRead && m.castId === activeCast.value.id) {
-                            needsUpdate = true; return { ...m, isRead: true };
-                        }
-                        // Manager viewing messages from cast
-                        if(!activeCast.value && viewingChatId.value && m.isSenderCast && !m.isRead && m.castId === viewingChatId.value) {
-                            needsUpdate = true; return { ...m, isRead: true };
-                        }
+                        if(activeCast.value && !m.isSenderCast && !m.isRead && m.castId === activeCast.value.id) { needsUpdate = true; return { ...m, isRead: true }; }
+                        if(!activeCast.value && viewingChatId.value && m.isSenderCast && !m.isRead && m.castId === viewingChatId.value) { needsUpdate = true; return { ...m, isRead: true }; }
                         return m;
                     });
                     if(needsUpdate) await updateStore({ messages: newMessages });
                 };
 
-                // Announcement Logic
                 const openNews = (news) => { selectedNews.value = news; };
-                const postAnnouncement = async () => { 
-                    if(newAnnouncementText.value) { 
-                        const news = { id: Date.now().toString(), text: newAnnouncementText.value, date: new Date().toISOString(), readBy: [] };
-                        await updateStore({ announcements: arrayUnion(news) }); 
-                        showAnnouncementModal.value=false; newAnnouncementText.value=''; 
-                    } 
-                };
+                const postAnnouncement = async () => { if(newAnnouncementText.value) { const news = { id: Date.now().toString(), text: newAnnouncementText.value, date: new Date().toISOString(), readBy: [] }; await updateStore({ announcements: arrayUnion(news) }); showAnnouncementModal.value=false; newAnnouncementText.value=''; } };
                 const deleteAnnouncement = async (news) => { await updateStore({ announcements: arrayRemove(news) }); };
                 const confirmNews = async () => {
                     if(!selectedNews.value || !activeCast.value) return;
-                    // remove old, add new with readBy
                     const oldNews = storeData.value.announcements.find(n => n.id === selectedNews.value.id);
-                    if(oldNews) {
-                        const newNews = JSON.parse(JSON.stringify(oldNews));
-                        if(!newNews.readBy) newNews.readBy = [];
-                        if(!newNews.readBy.includes(activeCast.value.id)) newNews.readBy.push(activeCast.value.id);
-                        
-                        // Firestore array update trick: remove then add
-                        await updateStore({ announcements: arrayRemove(oldNews) });
-                        await updateStore({ announcements: arrayUnion(newNews) });
-                        selectedNews.value = null;
-                    }
+                    if(oldNews) { const newNews = JSON.parse(JSON.stringify(oldNews)); if(!newNews.readBy) newNews.readBy = []; if(!newNews.readBy.includes(activeCast.value.id)) newNews.readBy.push(activeCast.value.id); await updateStore({ announcements: arrayRemove(oldNews) }); await updateStore({ announcements: arrayUnion(newNews) }); selectedNews.value = null; }
                 };
 
                 const registerStore = async () => {
                     if(!newStoreName.value || !newStoreEmail.value) { alert("店舗名とメールアドレスを入力してください"); return; }
                     isLoading.value = true;
-                    const id = generateRandomId('ST-', 8);
-                    const adm = generateRandomId('ADM-', 8);
-                    const pass = generateRandomPass();
+                    const id = generateRandomId('ST-', 8); const adm = generateRandomId('ADM-', 8); const pass = generateRandomPass();
                     try {
-                        await addDoc(collection(db, "stores"), {
-                            storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: pass,
-                            casts: [], shifts: [], messages: [], announcements: [], backOptions: []
-                        });
-                        if(window.emailjs) {
-                            const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass };
-                            await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params);
-                        }
+                        await addDoc(collection(db, "stores"), { storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: pass, casts: [], shifts: [], messages: [], announcements: [], backOptions: [], storeEmail: newStoreEmail.value });
+                        if(window.emailjs) { const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass }; await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params); }
                         alert(`登録完了！メールを送信しました。\n店舗ID: ${id}\n管理者ID: ${adm}\nPass: ${pass}`);
-                        newStoreName.value = ''; newStoreEmail.value = ''; showRegisterModal.value = false;
-                        checkFirstRun();
+                        newStoreName.value = ''; newStoreEmail.value = ''; showRegisterModal.value = false; checkFirstRun();
                     } catch(e) { alert("エラー: " + e.message); }
                     isLoading.value = false;
                 };
 
-                const loginStaff = async () => {
-                    isLoading.value = true;
-                    const q = query(collection(db, "stores"), where("staffLoginId", "==", staffIdInput.value), where("staffPassword", "==", staffPassInput.value));
-                    const snap = await getDocs(q);
-                    if(!snap.empty) {
-                        const d = snap.docs[0];
-                        currentStoreDocId.value = d.id;
-                        currentCastId.value = null;
-                        subscribeToStore(d.id);
-                        isLoggedIn.value = true;
-                        currentTab.value = 'staff-home';
-                    } else { alert("IDまたはパスワードが違います"); }
-                    isLoading.value = false;
-                };
-
-                const loginCast = async () => {
-                    isLoading.value = true;
-                    const q = query(collection(db, "stores"), where("storeDisplayId", "==", storeIdInput.value.toUpperCase()));
-                    const snap = await getDocs(q);
-                    if(!snap.empty) {
-                        const d = snap.docs[0];
-                        const data = d.data();
-                        const cast = data.casts.find(c => c.code === castCodeInput.value.toUpperCase());
-                        if(cast) {
-                            currentStoreDocId.value = d.id;
-                            currentCastId.value = cast.id;
-                            subscribeToStore(d.id);
-                            isLoggedIn.value = true;
-                            currentTab.value = 'cast-calendar';
-                            markChatRead(); // Mark read on login
-                        } else { alert("キャストコードが見つかりません"); }
-                    } else { alert("店舗IDが見つかりません"); }
-                    isLoading.value = false;
-                };
-                
+                const loginStaff = async () => { isLoading.value = true; const q = query(collection(db, "stores"), where("staffLoginId", "==", staffIdInput.value), where("staffPassword", "==", staffPassInput.value)); const snap = await getDocs(q); if(!snap.empty) { const d = snap.docs[0]; currentStoreDocId.value = d.id; currentCastId.value = null; subscribeToStore(d.id); isLoggedIn.value = true; currentTab.value = 'staff-home'; } else { alert("IDまたはパスワードが違います"); } isLoading.value = false; };
+                const loginCast = async () => { isLoading.value = true; const q = query(collection(db, "stores"), where("storeDisplayId", "==", storeIdInput.value.toUpperCase())); const snap = await getDocs(q); if(!snap.empty) { const d = snap.docs[0]; const data = d.data(); const cast = data.casts.find(c => c.code === castCodeInput.value.toUpperCase()); if(cast) { currentStoreDocId.value = d.id; currentCastId.value = cast.id; subscribeToStore(d.id); isLoggedIn.value = true; currentTab.value = 'cast-calendar'; markChatRead(); } else { alert("キャストコードが見つかりません"); } } else { alert("店舗IDが見つかりません"); } isLoading.value = false; };
                 const logout = () => { isLoggedIn.value=false; currentStoreDocId.value=null; currentCastId.value=null; if(unsubscribe) unsubscribe(); };
                 
-                const addCast = async () => {
-                    const n = prompt("名前");
-                    if(n) {
-                        const code = generateRandomId('C-', 6);
-                        const newCast = { id: Date.now().toString(), name: n, code: code, settings:{hourlyRate:2000, showSalary:true} };
-                        await updateStore({ casts: arrayUnion(newCast) });
-                        alert(`キャストを追加しました。\nコード: ${code}`);
-                    }
-                };
+                const addCast = async () => { const n = prompt("名前"); if(n) { const code = generateRandomId('C-', 6); const newCast = { id: Date.now().toString(), name: n, code: code, settings:{hourlyRate:2000, showSalary:true} }; await updateStore({ casts: arrayUnion(newCast) }); alert(`キャストを追加しました。\nコード: ${code}`); } };
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
                 const deleteBackOption = async (opt) => { await updateStore({ backOptions: arrayRemove(opt) }); };
                 
                 const selectDate=(d)=>{ selectedDate.value=d; const s=getShift(d); editingShift.type=s?s.type:'出勤'; editingShift.startTime=s?s.startTime:'20:00'; editingShift.endTime=s?s.endTime:'25:00'; editingShift.note=s?s.note:''; editingShift.backs = s && s.backs ? {...s.backs} : {}; };
+                const selectManagerDate=(d)=>{ selectedManagerDate.value=d; };
                 const getShift=(d)=>storeData.value.shifts.find(s=>s.date===d && s.castId===currentCastId.value);
                 const submitShift = async () => { const s = getShift(selectedDate.value); if(s) await updateStore({ shifts: arrayRemove(s) }); const newShift = { id: Date.now().toString(), date: selectedDate.value, castId: currentCastId.value, castName: activeCast.value.name, status: '承認待ち', ...editingShift, backs:{...editingShift.backs} }; await updateStore({ shifts: arrayUnion(newShift) }); alert("保存しました"); };
                 const updateShift = async (s, st) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; await updateStore({ shifts: arrayUnion(newS) }); };
-                const reportAbsence = async () => { if(confirm("連絡しますか？")) { selectDate(new Date().toISOString().split('T')[0]); editingShift.type='欠勤'; await submitShift(); await sendMessageText('【自動】欠勤・遅刻連絡', true); } };
-                const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
-                const sendMessageText = async (txt, isCast) => { 
-                    if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; 
-                    const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; 
-                    await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; 
-                };
-                const uploadIcon = async (e) => {
-                    const file = e.target.files[0];
-                    if(file && file.size < 100000) {
-                        const reader = new FileReader();
-                        reader.onload = async (e) => {
-                            const base64 = e.target.result;
-                            if(activeCast.value) {
-                                const newCast = JSON.parse(JSON.stringify(activeCast.value)); newCast.icon = base64;
-                                await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) });
-                            } else {
-                                await updateStore({ icon: base64 });
-                            }
-                        };
-                        reader.readAsDataURL(file);
-                    } else { alert("画像サイズが大きすぎます (100KB以下)"); }
+                
+                // ★ 欠勤報告 & メール通知機能
+                const reportAbsence = async () => { 
+                    if(confirm("店長に欠勤・遅刻の連絡をしますか？\n（メール通知が送られます）")) { 
+                        // 1. シフト申請 (欠勤)
+                        selectDate(new Date().toISOString().split('T')[0]); 
+                        editingShift.type='欠勤'; 
+                        await submitShift(); 
+                        
+                        // 2. チャット送信
+                        await sendMessageText('【自動連絡】欠勤・遅刻の連絡をしました', true);
+
+                        // 3. メール送信 (店長のアドレスがあれば)
+                        if(storeData.value.storeEmail && window.emailjs) {
+                            const params = { 
+                                to_email: storeData.value.storeEmail, 
+                                subject: `【欠勤連絡】${activeCast.value.name}さんから連絡があります`,
+                                message: `${activeCast.value.name}さんが本日の欠勤・遅刻を報告しました。\nアプリを確認してください。`
+                            };
+                            try {
+                                await emailjs.send(emailConfig.serviceId, emailConfig.notificationTemplateId, params);
+                                alert("店長へメール通知を送信しました。");
+                            } catch(e) { console.error("Email failed", e); }
+                        }
+                    } 
                 };
 
-                const openChat = (cid, n) => { 
-                    viewingChatId.value=cid;
-                    markChatRead();
-                };
+                const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
+                const sendMessageText = async (txt, isCast) => { if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; };
+                const uploadIcon = async (e) => { const file = e.target.files[0]; if(file && file.size < 100000) { const reader = new FileReader(); reader.onload = async (e) => { const base64 = e.target.result; if(activeCast.value) { const newCast = JSON.parse(JSON.stringify(activeCast.value)); newCast.icon = base64; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); } else { await updateStore({ icon: base64 }); } }; reader.readAsDataURL(file); } else { alert("画像サイズが大きすぎます (100KB以下)"); } };
+                const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); };
                 const closeChat = () => { viewingChatId.value = null; };
                 
                 const activeCast = computed(()=>storeData.value.casts.find(c=>c.id===currentCastId.value));
                 const pageTitle = computed(()=>activeCast.value?'Cast':'Manager');
-                const pendingShifts = computed(()=>storeData.value.shifts.filter(s=>s.status==='承認待ち').sort((a,b)=>new Date(a.date)-new Date(b.date)));
+                const pendingShifts = computed(()=>storeData.value.shifts.filter(s=>s.status==='承認待ち' && s.type!=='欠勤').sort((a,b)=>new Date(a.date)-new Date(b.date))); // 欠勤以外
+                const absenceShifts = computed(()=>storeData.value.shifts.filter(s=>s.status==='承認待ち' && s.type==='欠勤').sort((a,b)=>new Date(a.date)-new Date(b.date))); // 欠勤のみ
                 const calendarDays = computed(()=>{ const d=[]; const s=new Date(); s.setDate(1); for(let i=0;i<35;i++){const x=new Date(s);x.setDate(s.getDate()+i);d.push(x.toISOString().split('T')[0]);} return d; });
-                const currentMessages = computed(()=>{ 
-                    const tid = activeCast.value ? activeCast.value.id : viewingChatId.value;
-                    return storeData.value.messages.filter(m=>m.castId===tid).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
-                });
-                const totalUnread = computed(()=> {
-                    if(!activeCast.value) return 0;
-                    return storeData.value.messages.filter(m=>m.castId===activeCast.value.id && !m.isSenderCast && !m.isRead).length;
-                });
+                const currentMessages = computed(()=>{ const tid = activeCast.value ? activeCast.value.id : viewingChatId.value; return storeData.value.messages.filter(m=>m.castId===tid).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)); });
+                const totalUnread = computed(()=> { if(!activeCast.value) return 0; return storeData.value.messages.filter(m=>m.castId===activeCast.value.id && !m.isSenderCast && !m.isRead).length; });
                 const getUnreadCount = (cid) => storeData.value.messages.filter(m=>m.castId===cid && m.isSenderCast && !m.isRead).length;
-
-                const todayShifts = computed(() => {
-                    const today = new Date().toISOString().split('T')[0];
-                    return storeData.value.shifts.filter(s => s.date === today && s.type === '出勤' && s.status === '承認済み');
-                });
+                const todayShifts = computed(() => { const today = new Date().toISOString().split('T')[0]; return storeData.value.shifts.filter(s => s.date === today && s.type === '出勤' && s.status === '承認済み'); });
                 const getStaffCount = (date) => storeData.value.shifts.filter(s => s.date === date && s.type === '出勤' && s.status === '承認済み').length;
-
-                const salaryInfo = computed(() => {
-                    if(!activeCast.value) return {confirmed:0, pending:0};
-                    const thisMonth = new Date().getMonth();
-                    const myShifts = storeData.value.shifts.filter(s => s.castId === currentCastId.value && new Date(s.date).getMonth() === thisMonth && s.type === '出勤');
-                    const hourly = activeCast.value.settings?.hourlyRate || 0;
-                    const backOpts = storeData.value.backOptions || [];
-                    
-                    const calc = (shifts) => {
-                        let total = 0;
-                        shifts.forEach(s => {
-                            const start = parseInt(s.startTime.split(':')[0]) + parseInt(s.startTime.split(':')[1])/60;
-                            const end = parseInt(s.endTime.split(':')[0]) + parseInt(s.endTime.split(':')[1])/60;
-                            total += (end - start) * hourly;
-                            if(s.backs) { Object.keys(s.backs).forEach(oid=>{const c=parseInt(s.backs[oid]); const o=backOpts.find(x=>x.id===oid); if(o) total+=c*o.price;}); }
-                        });
-                        return Math.floor(total);
-                    };
-                    return { confirmed: calc(myShifts.filter(s => s.status === '承認済み')), pending: calc(myShifts.filter(s => s.status === '承認待ち')) };
-                });
-
+                const getDailyShifts = (date) => storeData.value.shifts.filter(s => s.date === date && s.type === '出勤' && s.status === '承認済み');
+                const salaryInfo = computed(() => { if(!activeCast.value) return {confirmed:0, pending:0}; const thisMonth = new Date().getMonth(); const myShifts = storeData.value.shifts.filter(s => s.castId === currentCastId.value && new Date(s.date).getMonth() === thisMonth && s.type === '出勤'); const hourly = activeCast.value.settings?.hourlyRate || 0; const backOpts = storeData.value.backOptions || []; const calc = (shifts) => { let total = 0; shifts.forEach(s => { const start = parseInt(s.startTime.split(':')[0]) + parseInt(s.startTime.split(':')[1])/60; const end = parseInt(s.endTime.split(':')[0]) + parseInt(s.endTime.split(':')[1])/60; total += (end - start) * hourly; if(s.backs) { Object.keys(s.backs).forEach(oid=>{const c=parseInt(s.backs[oid]); const o=backOpts.find(x=>x.id===oid); if(o) total+=c*o.price;}); } }); return Math.floor(total); }; return { confirmed: calc(myShifts.filter(s => s.status === '承認済み')), pending: calc(myShifts.filter(s => s.status === '承認待ち')) }; });
                 const toggleSalaryDisplay=async()=>{ const newCast = JSON.parse(JSON.stringify(activeCast.value)); if(!newCast.settings) newCast.settings={hourlyRate:2000, showSalary:true}; newCast.settings.showSalary = !newCast.settings.showSalary; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); };
                 const saveCastSettings=async()=>{ const newCast = JSON.parse(JSON.stringify(activeCast.value)); await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); };
                 const showQRCode=(c)=>{ qrTargetName.value=c.name; qrUrl.value=`${window.location.origin}${window.location.pathname}?store=${storeData.value.storeDisplayId}&code=${c.code}`; showQRModal.value=true; };
                 const openFeedback = () => { window.location.href = `mailto:NightShiftPro.app@gmail.com?subject=NightShiftPro不具合報告&body=店舗ID:${storeData.value.storeDisplayId}`; };
-                
                 const formatDate=(d)=>new Date(d).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
                 const formatTime=(t)=>t.includes('T') ? new Date(t).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : t;
                 const isSameDay=(a,b)=>a===b;
@@ -575,7 +490,7 @@
                 const getLastMsg=(cid)=>{const m=storeData.value.messages.filter(x=>x.castId===cid);return m.length?m[m.length-1].text:'';};
                 const isMyMessage=(m)=>{if(activeCast.value)return m.isSenderCast;return !m.isSenderCast;};
 
-                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, getShift, submitShift, updateShift, reportAbsence, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, uploadIcon, selectedNews, openNews, confirmNews, markChatRead };
+                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, selectedManagerDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, selectManagerDate, getShift, getDailyShifts, submitShift, updateShift, reportAbsence, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore };
             }
         }).mount('#app');
     </script>
