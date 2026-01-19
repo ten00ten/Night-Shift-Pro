@@ -95,13 +95,9 @@
                         <div class="flex flex-col gap-2">
                             <div v-for="s in todayShifts" :key="s.id" class="flex items-center gap-3 bg-blue-50 dark:bg-gray-700 p-2 rounded-lg relative overflow-hidden">
                                 <div v-if="s.attendanceConfirmed" class="absolute right-0 top-0 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-bl font-bold">出勤OK</div>
-                                
                                 <img v-if="getCastIcon(s.castId)" :src="getCastIcon(s.castId)" class="w-8 h-8 rounded-full profile-img bg-white">
                                 <div v-else class="w-8 h-8 bg-blue-200 rounded-full flex center items-center justify-center text-blue-500 text-xs"><i class="fa-solid fa-user"></i></div>
-                                <div class="flex-1 font-bold text-sm flex items-center gap-2">
-                                    {{ s.castName }}
-                                    <i v-if="s.attendanceConfirmed" class="fa-solid fa-circle-check text-green-500"></i>
-                                </div>
+                                <div class="flex-1 font-bold text-sm flex items-center gap-2">{{ s.castName }}<i v-if="s.attendanceConfirmed" class="fa-solid fa-circle-check text-green-500"></i></div>
                                 <div class="text-xs font-mono bg-white dark:bg-gray-600 px-2 py-1 rounded">{{ s.startTime }}-{{ s.endTime }}</div>
                             </div>
                         </div>
@@ -143,29 +139,33 @@
                     
                     <div v-if="activeCast" class="mb-4 space-y-2">
                         <div v-if="todaysMyShift && !todaysMyShift.attendanceConfirmed" class="bg-blue-50 border border-blue-200 p-3 rounded-xl flex items-center justify-between">
-                            <div class="text-sm text-blue-800 font-bold">本日のシフト: {{todaysMyShift.startTime}}-{{todaysMyShift.endTime}}</div>
+                            <div class="text-sm text-blue-800 font-bold">本日シフト: {{todaysMyShift.startTime}}-{{todaysMyShift.endTime}}</div>
                             <button @click="confirmAttendance(todaysMyShift)" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm shadow">出勤確認</button>
                         </div>
-                        <div v-if="todaysMyShift && todaysMyShift.attendanceConfirmed" class="bg-green-50 border border-green-200 p-2 rounded-xl text-center text-green-700 text-xs font-bold">
-                            <i class="fa-solid fa-check"></i> 出勤確認済み
-                        </div>
-
+                        <div v-if="todaysMyShift && todaysMyShift.attendanceConfirmed" class="bg-green-50 border border-green-200 p-2 rounded-xl text-center text-green-700 text-xs font-bold"><i class="fa-solid fa-check"></i> 出勤確認済み</div>
                         <button @click="reportAbsence" class="w-full p-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-200 shadow-sm"><i class="fa-solid fa-triangle-exclamation"></i> 当日欠勤・遅刻連絡</button>
+                    </div>
+
+                    <div v-if="activeCast && activeCast.settings?.showSalary" class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl p-4 text-white shadow-lg mb-4">
+                        <div class="flex justify-between items-end mb-1"><div class="text-xs opacity-90">確定給与</div><div class="text-xl font-bold">¥{{ salaryInfo.confirmed.toLocaleString() }}</div></div>
+                        <div class="flex justify-between items-end border-t border-white/30 pt-1"><div class="text-xs opacity-80">＋承認待ち(見込み)</div><div class="text-sm font-bold opacity-90">¥{{ salaryInfo.pending.toLocaleString() }}</div></div>
                     </div>
 
                     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-4">
                         <div class="flex justify-between items-center mb-4">
                             <button @click="changeMonth(-1)" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700"><i class="fa-solid fa-chevron-left"></i></button>
-                            <div class="text-center">
-                                <h3 class="font-bold text-lg">{{ currentMonthDisplay }}</h3>
-                                <button @click="goToToday" class="text-xs text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded mt-1">今日に戻る</button>
-                            </div>
+                            <div class="text-center"><h3 class="font-bold text-lg">{{ currentMonthDisplay }}</h3><button @click="goToToday" class="text-xs text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded mt-1">今日に戻る</button></div>
                             <button @click="changeMonth(1)" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700"><i class="fa-solid fa-chevron-right"></i></button>
                         </div>
-                        <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs text-gray-400"><span>日</span>...<span>土</span></div>
+                        
+                        <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs text-gray-400">
+                            <span v-for="w in ['日','月','火','水','木','金','土']" :key="w">{{w}}</span>
+                        </div>
+                        
                         <div class="grid grid-cols-7 gap-2">
                             <div v-for="day in calendarDays" :key="day.dateStr" @click="selectDate(day.dateStr)" class="aspect-square flex flex-col items-center justify-center rounded-lg border relative cursor-pointer" :class="isSameDay(day.dateStr, selectedDate) ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/30' : (day.isCurrentMonth ? 'border-transparent bg-gray-50 dark:bg-gray-700' : 'border-transparent bg-gray-100/50 dark:bg-gray-800/50 text-gray-400')">
-                                <span class="text-sm" :class="{'font-bold text-blue-600': isSameDay(day.dateStr, todayStr)}">{{ new Date(day.dateStr).getDate() }}</span>
+                                <span class="text-sm" :class="{'font-bold text-blue-600': isSameDay(day.dateStr, todayStr)}">{{ day.dateStr ? new Date(day.dateStr).getDate() : '' }}</span>
+                                
                                 <div class="h-1 mt-1 flex gap-0.5"><div v-if="activeCast && getMyShift(day.dateStr)" class="w-1.5 h-1.5 rounded-full" :class="getShiftColor(getMyShift(day.dateStr))"></div></div>
                                 <div v-if="!activeCast && getStaffCount(day.dateStr)>0" class="absolute bottom-0 right-0 text-[8px] bg-blue-100 text-blue-600 px-1 rounded-tl">{{ getStaffCount(day.dateStr) }}</div>
                             </div>
@@ -184,12 +184,10 @@
                                 <img v-if="getCastIcon(s.castId)" :src="getCastIcon(s.castId)" class="w-10 h-10 rounded-full profile-img bg-gray-200">
                                 <div v-else class="w-10 h-10 bg-gray-200 rounded-full flex center items-center justify-center text-gray-400"><i class="fa-solid fa-user"></i></div>
                                 <div class="flex-1">
-                                    <div class="font-bold flex items-center gap-2">
-                                        {{ s.castName }}
-                                        <i v-if="s.attendanceConfirmed" class="fa-solid fa-circle-check text-green-500 text-sm" title="出勤確認済み"></i>
-                                    </div>
+                                    <div class="font-bold flex items-center gap-2">{{ s.castName }}<i v-if="s.attendanceConfirmed" class="fa-solid fa-circle-check text-green-500 text-sm"></i></div>
                                     <div class="text-xs text-gray-400">実績: {{ Object.keys(s.backs||{}).length }}件</div>
                                 </div>
+                                <button @click="remindAttendance(s.castId)" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded border border-blue-200 hover:bg-blue-200"><i class="fa-regular fa-paper-plane"></i> 連絡</button>
                                 <div class="text-sm bg-blue-50 text-blue-600 px-2 py-1 rounded font-mono">{{ s.startTime }} - {{ s.endTime }}</div>
                             </div>
                         </div>
@@ -198,10 +196,7 @@
                             <div class="flex bg-gray-100 dark:bg-gray-700 rounded-lg mb-6"><button v-for="t in ['出勤','休み','要相談']" @click="editingShift.type=t" class="flex-1 py-2 text-sm rounded-md font-bold" :class="editingShift.type===t?'bg-white shadow text-black':'text-gray-400'">{{ t }}</button></div>
                             <div v-if="editingShift.type==='出勤'">
                                 <div class="flex gap-2 mb-4"><input v-model="editingShift.startTime" type="time" class="flex-1 p-2 border rounded dark:bg-gray-700"><input v-model="editingShift.endTime" type="time" class="flex-1 p-2 border rounded dark:bg-gray-700"></div>
-                                <div v-if="storeData.backOptions?.length > 0" class="mb-4 space-y-2">
-                                    <label class="text-xs text-gray-500 font-bold">本日の実績</label>
-                                    <div v-for="opt in storeData.backOptions" :key="opt.id" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-2 rounded"><span class="text-xs">{{ opt.name }}</span><input type="number" v-model="editingShift.backs[opt.id]" placeholder="0" class="w-16 p-1 text-right rounded border dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"></div>
-                                </div>
+                                <div v-if="storeData.backOptions?.length > 0" class="mb-4 space-y-2"><div v-for="opt in storeData.backOptions" :key="opt.id" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-2 rounded"><span class="text-xs">{{ opt.name }}</span><input type="number" v-model="editingShift.backs[opt.id]" placeholder="0" class="w-16 p-1 text-right rounded border dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"></div></div>
                             </div>
                             <input v-model="editingShift.note" placeholder="備考" class="w-full p-3 border rounded mb-4 dark:bg-gray-700">
                             <button @click="submitShift" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl shadow-lg mb-6">保存</button>
@@ -267,11 +262,13 @@
         import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
+        
+        // ★★★ 下のIDをご自身のものに書き換えてください！ ★★★
         const emailConfig = { 
             publicKey: "pBXsfa-38OMNK1E6b", 
             serviceId: "service_71f25g6", 
-            templateId: "template_675u7wq", 
-            notificationTemplateId: "Template_36z9afr" 
+            templateId: "template_675u7wq", // 登録用
+            notificationTemplateId: "Template_36z9afr" // ← 通知用
         };
 
         const app = initializeApp(firebaseConfig);
@@ -296,7 +293,6 @@
                 const currentCastId = ref(null);
                 const currentMonth = ref(new Date());
                 const selectedDate = ref(new Date().toISOString().split('T')[0]);
-                const selectedManagerDate=ref(new Date().toISOString().split('T')[0]);
                 const editingShift = reactive({type:'出勤',startTime:'20:00',endTime:'25:00',note:'', backs:{}});
                 const showAnnouncementModal=ref(false); const newAnnouncementText=ref('');
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
@@ -305,7 +301,6 @@
                 const showHelpModal=ref(null); const isFirstRun = ref(false);
                 const selectedNews = ref(null);
 
-                // Helper Functions
                 const generateRandomId = (prefix, length) => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = ''; for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length)); return prefix + result; };
                 const generateRandomPass = () => Math.random().toString(36).slice(-8);
 
@@ -337,26 +332,15 @@
                 });
 
                 const updateStore = async (data) => { if(currentStoreDocId.value) await updateDoc(doc(db, "stores", currentStoreDocId.value), data); };
-                
-                // バッジ消去ロジック修正
                 const markChatRead = async () => {
                     if(!storeData.value.messages) return;
                     let needsUpdate = false;
                     const newMessages = storeData.value.messages.map(m => {
-                        // キャストが見る: 店長からのメッセージを既読に
                         if(activeCast.value && !m.isSenderCast && !m.isRead && m.castId === activeCast.value.id) { needsUpdate = true; return { ...m, isRead: true }; }
-                        // 店長が見る: 今開いているキャストからのメッセージを既読に
                         if(!activeCast.value && viewingChatId.value && m.isSenderCast && !m.isRead && m.castId === viewingChatId.value) { needsUpdate = true; return { ...m, isRead: true }; }
                         return m;
                     });
                     if(needsUpdate) await updateStore({ messages: newMessages });
-                };
-
-                // 出勤確認 (キャスト)
-                const confirmAttendance = async (s) => {
-                    if(!s) return;
-                    await updateShift(s, '承認済み', true); // confirmed=true
-                    alert("出勤確認を完了しました！");
                 };
 
                 const openNews = (news) => { selectedNews.value = news; };
@@ -374,11 +358,7 @@
                     const id = generateRandomId('ST-', 8); const adm = generateRandomId('ADM-', 8); const pass = generateRandomPass();
                     try {
                         await addDoc(collection(db, "stores"), { storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: pass, casts: [], shifts: [], messages: [], announcements: [], backOptions: [], storeEmail: newStoreEmail.value });
-                        // Email Logic
-                        if(window.emailjs) { 
-                            const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass };
-                            await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params); 
-                        }
+                        if(window.emailjs) { const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass }; await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params); }
                         alert(`登録完了！メールを送信しました。\n店舗ID: ${id}\n管理者ID: ${adm}\nPass: ${pass}`);
                         newStoreName.value = ''; newStoreEmail.value = ''; showRegisterModal.value = false; checkFirstRun();
                     } catch(e) { alert("エラー: " + e.message); }
@@ -392,15 +372,6 @@
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
                 const deleteBackOption = async (opt) => { await updateStore({ backOptions: arrayRemove(opt) }); };
-                
-                const calendarDays = computed(() => { const year = currentMonth.value.getFullYear(); const month = currentMonth.value.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const days = []; for(let i=0; i<firstDay.getDay(); i++) days.push({ dateStr: '', isCurrentMonth: false }); for(let i=1; i<=lastDay.getDate(); i++) { const d = new Date(year, month, i); const str = d.toISOString().split('T')[0]; days.push({ dateStr: str, isCurrentMonth: true }); } return days; });
-                const changeMonth = (n) => { const d = new Date(currentMonth.value); d.setMonth(d.getMonth() + n); currentMonth.value = d; };
-                const goToToday = () => { currentMonth.value = new Date(); selectedDate.value = new Date().toISOString().split('T')[0]; };
-                const currentMonthDisplay = computed(() => `${currentMonth.value.getFullYear()}年 ${currentMonth.value.getMonth() + 1}月`);
-                const todayStr = computed(() => new Date().toISOString().split('T')[0]);
-                const selectDate=(d)=>{ if(!d) return; selectedDate.value=d; const s=getMyShift(d); editingShift.type=s?s.type:'出勤'; editingShift.startTime=s?s.startTime:'20:00'; editingShift.endTime=s?s.endTime:'25:00'; editingShift.note=s?s.note:''; editingShift.backs = s && s.backs ? {...s.backs} : {}; };
-                const getMyShift=(d)=>storeData.value.shifts.find(s=>s.date===d && s.castId===currentCastId.value);
-                const getCastIcon = (cid) => { const c = storeData.value.casts.find(x=>x.id===cid); return c ? c.icon : null; };
                 const submitShift = async () => { const s = getMyShift(selectedDate.value); if(s) await updateStore({ shifts: arrayRemove(s) }); const newShift = { id: Date.now().toString(), date: selectedDate.value, castId: currentCastId.value, castName: activeCast.value.name, status: '承認待ち', ...editingShift, backs:{...editingShift.backs} }; await updateStore({ shifts: arrayUnion(newShift) }); alert("保存しました"); };
                 const updateShift = async (s, st, confirmed = false) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; if(confirmed) newS.attendanceConfirmed = true; await updateStore({ shifts: arrayUnion(newS) }); };
                 const reportAbsence = async () => { 
@@ -413,13 +384,24 @@
                         }
                     } 
                 };
+                // ★ リマインド機能 (チャット送信)
+                const remindAttendance = async (castId) => {
+                    const c = storeData.value.casts.find(x=>x.id===castId);
+                    if(!c) return;
+                    if(confirm(`${c.name}さんに「出勤リマインド」を送りますか？`)) {
+                        const msg = { id:Date.now().toString(), text:`本日は出勤日です。よろしくお願いします。`, isSenderCast:false, timestamp:new Date().toISOString(), castId:castId, isRead:false }; 
+                        await updateStore({ messages: arrayUnion(msg) });
+                        alert("送信しました！");
+                    }
+                };
+
                 const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
                 const sendMessageText = async (txt, isCast) => { if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; };
                 const uploadIcon = async (e) => { const file = e.target.files[0]; if(file && file.size < 100000) { const reader = new FileReader(); reader.onload = async (e) => { const base64 = e.target.result; if(activeCast.value) { const newCast = JSON.parse(JSON.stringify(activeCast.value)); newCast.icon = base64; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); } else { await updateStore({ icon: base64 }); } }; reader.readAsDataURL(file); } else { alert("画像サイズが大きすぎます (100KB以下)"); } };
                 const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); };
                 const closeChat = () => { viewingChatId.value = null; };
                 const activeCast = computed(()=>storeData.value.casts.find(c=>c.id===currentCastId.value));
-                const pageTitle = computed(()=>activeCast.value?'Cast':'店舗管理者');
+                const pageTitle = computed(()=>activeCast.value?'キャスト':'店舗管理者');
                 const pendingShifts = computed(()=>storeData.value.shifts.filter(s=>s.status==='承認待ち' && s.type!=='欠勤').sort((a,b)=>new Date(a.date)-new Date(b.date)));
                 const absenceShifts = computed(()=>storeData.value.shifts.filter(s=>s.status==='承認待ち' && s.type==='欠勤').sort((a,b)=>new Date(a.date)-new Date(b.date)));
                 const currentMessages = computed(()=>{ const tid = activeCast.value ? activeCast.value.id : viewingChatId.value; return storeData.value.messages.filter(m=>m.castId===tid).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)); });
@@ -445,7 +427,7 @@
                 const getLastMsg=(cid)=>{const m=storeData.value.messages.filter(x=>x.castId===cid);return m.length?m[m.length-1].text:'';};
                 const isMyMessage=(m)=>{if(activeCast.value)return m.isSenderCast;return !m.isSenderCast;};
 
-                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, currentMonthDisplay, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, changeMonth, goToToday, todayStr, getShiftColor, getMyShift, getDailyShifts, submitShift, updateShift, reportAbsence, confirmAttendance, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, formatDateTime, isSameDay, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, getCastIcon, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore, sortedAnnouncements, todaysMyShift, getMyMonthlyShifts };
+                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, currentMonthDisplay, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, changeMonth, goToToday, todayStr, getShiftColor, getMyShift, getDailyShifts, submitShift, updateShift, reportAbsence, confirmAttendance, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, formatDateTime, isSameDay, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, getCastIcon, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore, sortedAnnouncements, todaysMyShift, getMyMonthlyShifts, remindAttendance };
             }
         }).mount('#app');
     </script>
