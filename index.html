@@ -74,6 +74,33 @@
             </div>
         </div>
 
+        <div v-else-if="isSuperAdmin" class="flex-1 flex flex-col h-full bg-gray-900 text-white">
+            <header class="bg-gray-800 border-b border-gray-700 px-4 py-4 pt-12 shadow-sm flex justify-between items-center sticky top-0 z-10">
+                <h2 class="font-bold text-lg text-yellow-400"><i class="fa-solid fa-lock mr-2"></i>Super Admin</h2>
+                <button @click="logout" class="text-xs bg-red-600 px-3 py-1 rounded">ログアウト</button>
+            </header>
+            <main class="flex-1 overflow-y-auto p-4">
+                <h3 class="font-bold mb-4 text-gray-400">登録店舗一覧 ({{ allStoresList.length }})</h3>
+                <div v-if="allStoresList.length === 0" class="text-center text-gray-500 mt-10">店舗データなし</div>
+                <div v-for="store in allStoresList" :key="store.id" class="bg-gray-800 p-4 rounded-xl mb-4 border border-gray-700">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <div class="font-bold text-lg text-white">{{ store.storeName }}</div>
+                            <div class="text-xs text-gray-400 font-mono">ID: {{ store.storeDisplayId }}</div>
+                        </div>
+                        <button @click="deleteStoreForce(store.id, store.storeName)" class="bg-red-900/50 text-red-400 border border-red-800 px-3 py-1 rounded text-xs hover:bg-red-900">
+                            <i class="fa-solid fa-trash mr-1"></i>削除
+                        </button>
+                    </div>
+                    <div class="text-xs text-gray-500 space-y-1 bg-gray-900/50 p-2 rounded">
+                        <div>📧 {{ store.storeEmail }}</div>
+                        <div>👤 StaffID: {{ store.staffLoginId }} / Pass: {{ store.staffPassword }}</div>
+                        <div>👥 キャスト数: {{ store.casts ? store.casts.length : 0 }}名</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
         <div v-else class="flex-1 flex flex-col h-full relative bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
             <header class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-b dark:border-gray-700 px-4 py-3 pt-12 shadow-sm flex justify-between items-center sticky top-0 z-10">
                 <div class="flex items-center space-x-2">
@@ -280,7 +307,7 @@
 
             <div v-if="viewingChatId || (activeCast && currentTab==='messages')" class="bg-white dark:bg-gray-800 p-3 border-t dark:border-gray-700 safe-area-bottom flex gap-2"><input v-model="chatInput" placeholder="入力..." class="flex-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-full dark:text-white"><button @click="sendMessage" :disabled="!chatInput" class="text-blue-500"><i class="fa-solid fa-paper-plane text-xl"></i></button></div>
             <nav v-if="!viewingChatId" class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 safe-area-bottom px-4 py-2 flex justify-between text-xs text-gray-400 z-20">
-                <template v-if="!activeCast">
+                <template v-if="!activeCast && !isSuperAdmin">
                     <button @click="currentTab='staff-home'" :class="{'text-blue-600':currentTab==='staff-home'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-house text-xl"></i><span class="text-[9px]">ホーム</span></button>
                     <button @click="currentTab='staff-calendar'; goToToday()" :class="{'text-blue-600':currentTab==='staff-calendar'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-calendar-days text-xl"></i><span class="text-[9px]">シフト</span></button>
                     <button @click="currentTab='messages'" :class="{'text-blue-600':currentTab==='messages'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-message text-xl"></i><span class="text-[9px]">トーク</span></button>
@@ -288,7 +315,7 @@
                     <button @click="currentTab='staff-casts'" :class="{'text-blue-600':currentTab==='staff-casts'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-users text-xl"></i><span class="text-[9px]">キャスト</span></button>
                     <button @click="currentTab='settings'" :class="{'text-blue-600':currentTab==='settings'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-gear text-xl"></i><span class="text-[9px]">設定</span></button>
                 </template>
-                <template v-else>
+                <template v-if="activeCast">
                     <button @click="currentTab='cast-home'" :class="{'text-pink-500':currentTab==='cast-home'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-house text-xl"></i><span class="text-[9px]">ホーム</span></button>
                     <button @click="markChatRead(); currentTab='cast-calendar'; goToToday()" :class="{'text-pink-500':currentTab==='cast-calendar'}" class="flex flex-col items-center w-12 gap-1"><i class="fa-solid fa-calendar-days text-xl"></i><span class="text-[9px]">シフト</span></button>
                     <button @click="markChatRead(); currentTab='messages'" :class="{'text-pink-500':currentTab==='messages'}" class="flex flex-col items-center w-12 gap-1 relative"><i class="fa-solid fa-message text-xl"></i><span class="text-[9px]">トーク</span><span v-if="totalUnread>0" class="absolute top-0 right-2 w-2 h-2 bg-red-500 rounded-full"></span></button>
@@ -310,16 +337,15 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-        import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
         
-        // ★★★ 修正済みID ★★★
         const emailConfig = { 
             publicKey: "pBXsfa-38OMNK1E6b", 
             serviceId: "service_71f25g6", 
             templateId: "template_675u7wq", 
-            notificationTemplateId: "template_36z9afr" // ← 小文字の t に修正済み！
+            notificationTemplateId: "template_36z9afr" 
         };
 
         const app = initializeApp(firebaseConfig);
@@ -334,6 +360,8 @@
                 const storeData = ref({ casts:[], shifts:[], messages:[], announcements:[], backOptions:[] });
                 const isLoggedIn = ref(false);
                 const isStaffLoginMode = ref(false);
+                const isSuperAdmin = ref(false); // ★ スーパー管理者フラグ
+                const allStoresList = ref([]);   // ★ 全店舗リスト用
                 const currentTab = ref('staff-home');
                 const viewingChatId = ref(null);
                 const staffIdInput=ref(''); const staffPassInput=ref('');
@@ -343,7 +371,7 @@
                 const currentStoreDocId = ref(null);
                 const currentCastId = ref(null);
                 const currentMonth = ref(new Date());
-                const selectedDate = ref(new Date().toISOString().split('T')[0]); // 初期化用
+                const selectedDate = ref(new Date().toISOString().split('T')[0]); 
                 const editingShift = reactive({type:'出勤',startTime:'20:00',endTime:'25:00',note:'', backs:{}});
                 const showAnnouncementModal=ref(false); const newAnnouncementText=ref('');
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
@@ -352,7 +380,6 @@
                 const showHelpModal=ref(null); const isFirstRun = ref(false);
                 const selectedNews = ref(null);
 
-                // 日付操作のヘルパー (UTCズレ防止)
                 const formatLocal = (d) => {
                     const year = d.getFullYear();
                     const month = ('0' + (d.getMonth() + 1)).slice(-2);
@@ -360,12 +387,10 @@
                     return `${year}-${month}-${day}`;
                 };
                 
-                // 初期化時に正しい日付をセット
                 onMounted(() => {
                     selectedDate.value = formatLocal(new Date());
                 });
 
-                // トークスクロール
                 const scrollToBottom = () => {
                     nextTick(() => {
                         if(mainScroll.value) mainScroll.value.scrollTop = mainScroll.value.scrollHeight;
@@ -453,9 +478,55 @@
                     isLoading.value = false;
                 };
 
-                const loginStaff = async () => { isLoading.value = true; const q = query(collection(db, "stores"), where("staffLoginId", "==", staffIdInput.value), where("staffPassword", "==", staffPassInput.value)); const snap = await getDocs(q); if(!snap.empty) { const d = snap.docs[0]; currentStoreDocId.value = d.id; currentCastId.value = null; subscribeToStore(d.id); isLoggedIn.value = true; currentTab.value = 'staff-home'; } else { alert("IDまたはパスワードが違います"); } isLoading.value = false; };
+                // ★ スーパー管理者用ログイン機能
+                const loginStaff = async () => { 
+                    isLoading.value = true;
+                    // スーパー管理者IDチェック
+                    if(staffIdInput.value === "ADMIN_MASTER" && staffPassInput.value === "NightShift2026") {
+                        isSuperAdmin.value = true;
+                        isLoggedIn.value = true;
+                        await fetchAllStores();
+                        isLoading.value = false;
+                        return;
+                    }
+
+                    const q = query(collection(db, "stores"), where("staffLoginId", "==", staffIdInput.value), where("staffPassword", "==", staffPassInput.value)); 
+                    const snap = await getDocs(q); 
+                    if(!snap.empty) { 
+                        const d = snap.docs[0]; 
+                        currentStoreDocId.value = d.id; 
+                        currentCastId.value = null; 
+                        subscribeToStore(d.id); 
+                        isLoggedIn.value = true; 
+                        currentTab.value = 'staff-home'; 
+                    } else { 
+                        alert("IDまたはパスワードが違います"); 
+                    } 
+                    isLoading.value = false; 
+                };
+
+                // ★ 全店舗データ取得
+                const fetchAllStores = async () => {
+                    const q = query(collection(db, "stores"));
+                    const snap = await getDocs(q);
+                    allStoresList.value = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                };
+
+                // ★ 店舗削除機能
+                const deleteStoreForce = async (docId, name) => {
+                    if(confirm(`【警告】\n店舗「${name}」を本当に削除しますか？\nこの操作は取り消せません。`)) {
+                        try {
+                            await deleteDoc(doc(db, "stores", docId));
+                            alert("削除しました。");
+                            await fetchAllStores(); // リスト更新
+                        } catch(e) {
+                            alert("削除エラー: " + e.message);
+                        }
+                    }
+                };
+
                 const loginCast = async () => { isLoading.value = true; const q = query(collection(db, "stores"), where("storeDisplayId", "==", storeIdInput.value.toUpperCase())); const snap = await getDocs(q); if(!snap.empty) { const d = snap.docs[0]; const data = d.data(); const cast = data.casts.find(c => c.code === castCodeInput.value.toUpperCase()); if(cast) { currentStoreDocId.value = d.id; currentCastId.value = cast.id; subscribeToStore(d.id); isLoggedIn.value = true; currentTab.value = 'cast-home'; markChatRead(); } else { alert("キャストコードが見つかりません"); } } else { alert("店舗IDが見つかりません"); } isLoading.value = false; };
-                const logout = () => { isLoggedIn.value=false; currentStoreDocId.value=null; currentCastId.value=null; if(unsubscribe) unsubscribe(); };
+                const logout = () => { isLoggedIn.value=false; isSuperAdmin.value=false; currentStoreDocId.value=null; currentCastId.value=null; if(unsubscribe) unsubscribe(); };
                 const addCast = async () => { const n = prompt("名前"); if(n) { const code = generateRandomId('C-', 6); const newCast = { id: Date.now().toString(), name: n, code: code, settings:{hourlyRate:2000, showSalary:true} }; await updateStore({ casts: arrayUnion(newCast) }); alert(`キャストを追加しました。\nコード: ${code}`); } };
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
@@ -500,7 +571,7 @@
                 const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
                 const sendMessageText = async (txt, isCast) => { if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; };
                 const uploadIcon = async (e) => { const file = e.target.files[0]; if(file && file.size < 100000) { const reader = new FileReader(); reader.onload = async (e) => { const base64 = e.target.result; if(activeCast.value) { const newCast = JSON.parse(JSON.stringify(activeCast.value)); newCast.icon = base64; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); } else { await updateStore({ icon: base64 }); } }; reader.readAsDataURL(file); } else { alert("画像サイズが大きすぎます (100KB以下)"); } };
-                const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); scrollToBottom(); }; // 自動スクロール追加
+                const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); scrollToBottom(); };
                 const closeChat = () => { viewingChatId.value = null; };
                 const activeCast = computed(()=>storeData.value.casts.find(c=>c.id===currentCastId.value));
                 const pageTitle = computed(()=>activeCast.value?'キャスト':'店舗管理者');
@@ -562,11 +633,10 @@
                 const getLastMsg=(cid)=>{const m=storeData.value.messages.filter(x=>x.castId===cid);return m.length?m[m.length-1].text:'';};
                 const isMyMessage=(m)=>{if(activeCast.value)return m.isSenderCast;return !m.isSenderCast;};
 
-                // ★スクロール監視の追加
                 watch(() => [currentTab.value, viewingChatId.value], () => { if (currentTab.value === 'messages' || viewingChatId.value) scrollToBottom(); });
                 watch(() => currentMessages.value.length, () => { if (currentTab.value === 'messages' || viewingChatId.value) scrollToBottom(); });
 
-                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, currentMonthDisplay, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, changeMonth, goToToday, todayStr, getShiftColor, getMyShift, getDailyShifts, submitShift, updateShift, reportAbsence, confirmAttendance, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, formatDateTime, isSameDay, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, getCastIcon, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore, sortedAnnouncements, todaysMyShift, getMyMonthlyShifts, remindAttendance, next7Days };
+                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, isSuperAdmin, allStoresList, deleteStoreForce, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, currentMonthDisplay, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, changeMonth, goToToday, todayStr, getShiftColor, getMyShift, getDailyShifts, submitShift, updateShift, reportAbsence, confirmAttendance, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, formatDateTime, isSameDay, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, getCastIcon, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore, sortedAnnouncements, todaysMyShift, getMyMonthlyShifts, remindAttendance, next7Days, fetchAllStores };
             }
         }).mount('#app');
     </script>
