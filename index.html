@@ -314,19 +314,19 @@
 
         const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
         
-        // ★★★ メールID設定 (ここはそのままでOK) ★★★
+        // ★★★ 修正済みID ★★★
         const emailConfig = { 
             publicKey: "pBXsfa-38OMNK1E6b", 
             serviceId: "service_71f25g6", 
             templateId: "template_675u7wq", 
-            notificationTemplateId: "template_36z9afr" 
+            notificationTemplateId: "template_36z9afr" // ← 小文字の t に修正済み！
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         if(window.emailjs) emailjs.init(emailConfig.publicKey);
 
-        const { createApp, ref, computed, reactive, onMounted, nextTick } = Vue;
+        const { createApp, ref, computed, reactive, onMounted, nextTick, watch } = Vue;
 
         createApp({
             setup() {
@@ -343,7 +343,7 @@
                 const currentStoreDocId = ref(null);
                 const currentCastId = ref(null);
                 const currentMonth = ref(new Date());
-                const selectedDate = ref(new Date().toISOString().split('T')[0]); // 初期化用（後で上書き）
+                const selectedDate = ref(new Date().toISOString().split('T')[0]); // 初期化用
                 const editingShift = reactive({type:'出勤',startTime:'20:00',endTime:'25:00',note:'', backs:{}});
                 const showAnnouncementModal=ref(false); const newAnnouncementText=ref('');
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
@@ -364,6 +364,13 @@
                 onMounted(() => {
                     selectedDate.value = formatLocal(new Date());
                 });
+
+                // トークスクロール
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        if(mainScroll.value) mainScroll.value.scrollTop = mainScroll.value.scrollHeight;
+                    });
+                };
 
                 const generateRandomId = (prefix, length) => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = ''; for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length)); return prefix + result; };
                 const generateRandomPass = () => Math.random().toString(36).slice(-8);
@@ -457,7 +464,6 @@
                 const updateShift = async (s, st, confirmed = false) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; if(confirmed) newS.attendanceConfirmed = true; await updateStore({ shifts: arrayUnion(newS) }); };
                 const reportAbsence = async () => { 
                     if(confirm("店長に欠勤・遅刻の連絡をしますか？\n（メール通知が送られます）")) { 
-                        // 今日 (YYYY-MM-DD)
                         const today = formatLocal(new Date());
                         selectDate(today); 
                         editingShift.type='欠勤'; 
@@ -465,15 +471,13 @@
                         
                         await sendMessageText('【自動連絡】欠勤・遅刻の連絡をしました', true);
                         
-                        // メール通知 (修正版)
                         if(storeData.value.storeEmail && window.emailjs) {
                             const params = { 
                                 to_email: storeData.value.storeEmail, 
                                 subject: `【欠勤連絡】${activeCast.value.name}さんから連絡があります`, 
                                 message: `${activeCast.value.name}さんが本日の欠勤・遅刻を報告しました。\nアプリを確認してください。`,
-                                // テンプレートのエラー回避用ダミーデータ
-                                name: activeCast.value.name, // From Name用
-                                email: "noreply@nightshift.app" // Reply To用
+                                name: activeCast.value.name,
+                                email: "noreply@nightshift.app"
                             };
                             try { 
                                 await emailjs.send(emailConfig.serviceId, emailConfig.notificationTemplateId, params); 
@@ -496,7 +500,7 @@
                 const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
                 const sendMessageText = async (txt, isCast) => { if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; };
                 const uploadIcon = async (e) => { const file = e.target.files[0]; if(file && file.size < 100000) { const reader = new FileReader(); reader.onload = async (e) => { const base64 = e.target.result; if(activeCast.value) { const newCast = JSON.parse(JSON.stringify(activeCast.value)); newCast.icon = base64; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); } else { await updateStore({ icon: base64 }); } }; reader.readAsDataURL(file); } else { alert("画像サイズが大きすぎます (100KB以下)"); } };
-                const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); };
+                const openChat = (cid, n) => { viewingChatId.value=cid; markChatRead(); scrollToBottom(); }; // 自動スクロール追加
                 const closeChat = () => { viewingChatId.value = null; };
                 const activeCast = computed(()=>storeData.value.casts.find(c=>c.id===currentCastId.value));
                 const pageTitle = computed(()=>activeCast.value?'キャスト':'店舗管理者');
@@ -531,7 +535,7 @@
                     for(let i=0; i<firstDay.getDay(); i++) days.push({ dateStr: '', isCurrentMonth: false }); 
                     for(let i=1; i<=lastDay.getDate(); i++) { 
                         const d = new Date(year, month, i); 
-                        const str = formatLocal(d); // ここで修正版の日付フォーマッターを使用
+                        const str = formatLocal(d); 
                         days.push({ dateStr: str, isCurrentMonth: true }); 
                     } 
                     return days; 
@@ -557,6 +561,10 @@
                 const getShiftColor=(s)=>{if(s.type==='欠勤')return 'bg-purple-500';if(s.status==='承認待ち')return 'bg-blue-300 animate-pulse-slow';if(s.type==='休み')return 'bg-red-500';return 'bg-blue-500';};
                 const getLastMsg=(cid)=>{const m=storeData.value.messages.filter(x=>x.castId===cid);return m.length?m[m.length-1].text:'';};
                 const isMyMessage=(m)=>{if(activeCast.value)return m.isSenderCast;return !m.isSenderCast;};
+
+                // ★スクロール監視の追加
+                watch(() => [currentTab.value, viewingChatId.value], () => { if (currentTab.value === 'messages' || viewingChatId.value) scrollToBottom(); });
+                watch(() => currentMessages.value.length, () => { if (currentTab.value === 'messages' || viewingChatId.value) scrollToBottom(); });
 
                 return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, absenceShifts, calendarDays, selectedDate, currentMonthDisplay, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, changeMonth, goToToday, todayStr, getShiftColor, getMyShift, getDailyShifts, submitShift, updateShift, reportAbsence, confirmAttendance, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, formatDateTime, isSameDay, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, getCastIcon, uploadIcon, selectedNews, openNews, confirmNews, markChatRead, updateStore, sortedAnnouncements, todaysMyShift, getMyMonthlyShifts, remindAttendance, next7Days };
             }
