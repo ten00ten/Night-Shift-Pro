@@ -20,6 +20,8 @@
         .msg-bubble { max-width: 75%; word-wrap: break-word; }
         .ad-banner { display: none; } 
         .profile-img { object-fit: cover; }
+        .news-item { transition: all 0.2s; }
+        .news-item:active { transform: scale(0.98); opacity: 0.8; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -70,7 +72,7 @@
         <div v-else class="flex-1 flex flex-col h-full relative bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
             <header class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-b dark:border-gray-700 px-4 py-3 pt-12 shadow-sm flex justify-between items-center sticky top-0 z-10">
                 <div class="flex items-center space-x-2">
-                    <button v-if="viewingChatId" @click="viewingChatId=null" class="text-blue-500 mr-1"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button v-if="viewingChatId" @click="closeChat" class="text-blue-500 mr-1"><i class="fa-solid fa-chevron-left"></i></button>
                     <h2 class="font-bold text-lg truncate max-w-[200px]">{{ pageTitle }}</h2>
                 </div>
                 <div v-if="activeCast" class="text-xs font-mono bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-100 px-2 py-1 rounded">{{ activeCast.name }}</div>
@@ -96,11 +98,11 @@
                             <h3 class="font-bold text-gray-500 dark:text-gray-400">お知らせ</h3>
                             <button @click="showAnnouncementModal=true" class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold">投稿</button>
                         </div>
-                        <div v-for="(news, i) in storeData.announcements" :key="i" class="text-sm border-b dark:border-gray-700 pb-2 mb-2 last:border-0">
-                            <div class="flex justify-between text-xs text-gray-400"><span>{{ formatDate(news.date) }}</span><button @click="deleteAnnouncement(news)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>
-                            <div class="mt-1 whitespace-pre-wrap">{{ news.text }}</div>
-                        </div>
                         <div v-if="storeData.announcements.length===0" class="text-xs text-gray-400 text-center">お知らせはありません</div>
+                        <div v-for="(news, i) in storeData.announcements" :key="i" @click="openNews(news)" class="news-item cursor-pointer text-sm border-b dark:border-gray-700 pb-2 mb-2 last:border-0 last:mb-0">
+                            <div class="flex justify-between text-xs text-gray-400"><span>{{ formatDate(news.date) }}</span><button @click.stop="deleteAnnouncement(news)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>
+                            <div class="mt-1 font-medium truncate">{{ news.text }}</div>
+                        </div>
                     </div>
 
                     <div class="text-sm text-gray-500 font-bold mb-2">承認待ちシフト</div>
@@ -136,9 +138,13 @@
                             <div class="flex items-center gap-2 mb-2 text-yellow-700 dark:text-yellow-400 font-bold text-sm">
                                 <i class="fa-solid fa-bullhorn"></i> お店からのお知らせ
                             </div>
-                            <div v-for="(news, i) in storeData.announcements" :key="i" class="text-sm border-b border-yellow-100 dark:border-yellow-800 last:border-0 pb-2 mb-2 last:pb-0 last:mb-0">
-                                <div class="text-xs text-gray-400 mb-1">{{ formatDate(news.date) }}</div>
-                                <div class="whitespace-pre-wrap font-medium">{{ news.text }}</div>
+                            <div v-for="(news, i) in storeData.announcements" :key="i" @click="openNews(news)" class="news-item cursor-pointer text-sm border-b border-yellow-100 dark:border-yellow-800 last:border-0 pb-2 mb-2 last:pb-0 last:mb-0">
+                                <div class="flex justify-between items-center">
+                                    <div class="text-xs text-gray-400">{{ formatDate(news.date) }}</div>
+                                    <div v-if="news.readBy && news.readBy.includes(activeCast.id)" class="text-[10px] bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold">✅ 確認済み</div>
+                                    <div v-else class="text-[10px] bg-red-100 text-red-500 px-2 py-0.5 rounded-full font-bold">NEW</div>
+                                </div>
+                                <div class="font-medium truncate mt-1">{{ news.text }}</div>
                             </div>
                         </div>
                     </div>
@@ -180,7 +186,7 @@
                 </div>
 
                 <div v-if="currentTab==='messages' && !viewingChatId && !activeCast">
-                    <div v-for="c in storeData.casts" :key="c.id" @click="openChat(c.id, c.name)" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm flex items-center gap-3 mb-2">
+                    <div v-for="c in storeData.casts" :key="c.id" @click="openChat(c.id, c.name)" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm flex items-center gap-3 mb-2 cursor-pointer">
                         <img v-if="c.icon" :src="c.icon" class="w-12 h-12 rounded-full profile-img bg-gray-200">
                         <div v-else class="w-12 h-12 bg-pink-100 rounded-full flex center justify-center items-center"><i class="fa-solid fa-user text-pink-500"></i></div>
                         <div class="flex-1"><div class="font-bold">{{ c.name }}</div><div class="text-xs text-gray-500 truncate">{{ getLastMsg(c.id) }}</div></div>
@@ -238,9 +244,9 @@
                     <button @click="currentTab='settings'" :class="{'text-blue-600':currentTab==='settings'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-gear text-xl"></i>設定</button>
                 </template>
                 <template v-else>
-                    <button @click="currentTab='cast-calendar'" :class="{'text-pink-500':currentTab==='cast-calendar'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-calendar-days text-xl"></i>シフト</button>
-                    <button @click="currentTab='messages'" :class="{'text-pink-500':currentTab==='messages'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-message text-xl"></i>トーク</button>
-                    <button @click="currentTab='settings'" :class="{'text-pink-500':currentTab==='settings'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-gear text-xl"></i>設定</button>
+                    <button @click="markChatRead(); currentTab='cast-calendar'" :class="{'text-pink-500':currentTab==='cast-calendar'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-calendar-days text-xl"></i>シフト</button>
+                    <button @click="markChatRead(); currentTab='messages'" :class="{'text-pink-500':currentTab==='messages'}" class="flex flex-col items-center w-16 gap-1 relative"><i class="fa-solid fa-message text-xl"></i>トーク<span v-if="totalUnread>0" class="absolute top-0 right-3 w-2 h-2 bg-red-500 rounded-full"></span></button>
+                    <button @click="markChatRead(); currentTab='settings'" :class="{'text-pink-500':currentTab==='settings'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-gear text-xl"></i>設定</button>
                 </template>
             </nav>
         </div>
@@ -248,6 +254,20 @@
         <div v-if="showAnnouncementModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl"><h3 class="font-bold mb-4">お知らせ投稿</h3><textarea v-model="newAnnouncementText" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg h-32 mb-4"></textarea><div class="flex gap-3"><button @click="showAnnouncementModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="postAnnouncement" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">投稿</button></div></div></div>
         <div v-if="showRegisterModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl"><h3 class="font-bold mb-4">新規店舗登録</h3><input v-model="newStoreName" placeholder="店舗名" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4"><input v-model="newStoreEmail" type="email" placeholder="メールアドレス" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4"><div class="flex gap-3"><button @click="showRegisterModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="registerStore" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">作成</button></div></div></div>
         <div v-if="showBackSettings" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl h-[70vh] flex flex-col"><h3 class="font-bold mb-4">バック設定</h3><div class="flex-1 overflow-y-auto space-y-2 mb-4"><div v-for="(opt, i) in storeData.backOptions" :key="i" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-2 rounded"><span>{{ opt.name }} (¥{{ opt.price }})</span><button @click="deleteBackOption(opt)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div></div><div class="border-t pt-4 space-y-2"><input v-model="newBackName" placeholder="項目名" class="w-full p-2 border rounded dark:bg-gray-700"><input v-model="newBackPrice" type="number" placeholder="単価" class="w-full p-2 border rounded dark:bg-gray-700"><button @click="addBackOption" class="w-full bg-blue-600 text-white py-2 rounded font-bold">追加</button><button @click="showBackSettings=false" class="w-full text-gray-500 mt-2">閉じる</button></div></div></div>
+        
+        <div v-if="selectedNews" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+                <div class="text-xs text-gray-400 mb-2">{{ formatDate(selectedNews.date) }}</div>
+                <div class="whitespace-pre-wrap font-medium mb-6 dark:text-gray-100 max-h-[50vh] overflow-y-auto">{{ selectedNews.text }}</div>
+                
+                <div v-if="activeCast">
+                    <button v-if="!selectedNews.readBy?.includes(activeCast.id)" @click="confirmNews" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg">確認しました</button>
+                    <button v-else class="w-full bg-gray-200 dark:bg-gray-700 text-gray-500 font-bold py-3 rounded-xl" disabled>確認済み</button>
+                </div>
+                <button @click="selectedNews=null" class="mt-3 w-full text-gray-500 py-2">閉じる</button>
+            </div>
+        </div>
+
         <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
                 <h3 class="font-bold mb-2">{{ qrTargetName }}</h3>
@@ -295,6 +315,9 @@
                 const newBackName=ref(''); const newBackPrice=ref('');
                 const showQRModal=ref(false); const qrUrl=ref(''); const qrTargetName=ref('');
                 const showHelpModal=ref(null); const isFirstRun = ref(false);
+                
+                // お知らせ関連
+                const selectedNews = ref(null);
 
                 // --- Helper Functions ---
                 const generateRandomId = (prefix, length) => {
@@ -347,13 +370,59 @@
                     checkFirstRun();
                 });
 
+                // Updates & Sync
+                const updateStore = async (data) => { if(currentStoreDocId.value) await updateDoc(doc(db, "stores", currentStoreDocId.value), data); };
+
+                // Read Receipt Logic (DB Update)
+                const markChatRead = async () => {
+                    if(!storeData.value.messages) return;
+                    let needsUpdate = false;
+                    const newMessages = storeData.value.messages.map(m => {
+                        // Cast viewing messages from manager
+                        if(activeCast.value && !m.isSenderCast && !m.isRead && m.castId === activeCast.value.id) {
+                            needsUpdate = true; return { ...m, isRead: true };
+                        }
+                        // Manager viewing messages from cast
+                        if(!activeCast.value && viewingChatId.value && m.isSenderCast && !m.isRead && m.castId === viewingChatId.value) {
+                            needsUpdate = true; return { ...m, isRead: true };
+                        }
+                        return m;
+                    });
+                    if(needsUpdate) await updateStore({ messages: newMessages });
+                };
+
+                // Announcement Logic
+                const openNews = (news) => { selectedNews.value = news; };
+                const postAnnouncement = async () => { 
+                    if(newAnnouncementText.value) { 
+                        const news = { id: Date.now().toString(), text: newAnnouncementText.value, date: new Date().toISOString(), readBy: [] };
+                        await updateStore({ announcements: arrayUnion(news) }); 
+                        showAnnouncementModal.value=false; newAnnouncementText.value=''; 
+                    } 
+                };
+                const deleteAnnouncement = async (news) => { await updateStore({ announcements: arrayRemove(news) }); };
+                const confirmNews = async () => {
+                    if(!selectedNews.value || !activeCast.value) return;
+                    // remove old, add new with readBy
+                    const oldNews = storeData.value.announcements.find(n => n.id === selectedNews.value.id);
+                    if(oldNews) {
+                        const newNews = JSON.parse(JSON.stringify(oldNews));
+                        if(!newNews.readBy) newNews.readBy = [];
+                        if(!newNews.readBy.includes(activeCast.value.id)) newNews.readBy.push(activeCast.value.id);
+                        
+                        // Firestore array update trick: remove then add
+                        await updateStore({ announcements: arrayRemove(oldNews) });
+                        await updateStore({ announcements: arrayUnion(newNews) });
+                        selectedNews.value = null;
+                    }
+                };
+
                 const registerStore = async () => {
                     if(!newStoreName.value || !newStoreEmail.value) { alert("店舗名とメールアドレスを入力してください"); return; }
                     isLoading.value = true;
                     const id = generateRandomId('ST-', 8);
                     const adm = generateRandomId('ADM-', 8);
                     const pass = generateRandomPass();
-
                     try {
                         await addDoc(collection(db, "stores"), {
                             storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: pass,
@@ -399,13 +468,13 @@
                             subscribeToStore(d.id);
                             isLoggedIn.value = true;
                             currentTab.value = 'cast-calendar';
+                            markChatRead(); // Mark read on login
                         } else { alert("キャストコードが見つかりません"); }
                     } else { alert("店舗IDが見つかりません"); }
                     isLoading.value = false;
                 };
                 
                 const logout = () => { isLoggedIn.value=false; currentStoreDocId.value=null; currentCastId.value=null; if(unsubscribe) unsubscribe(); };
-                const updateStore = async (data) => { if(currentStoreDocId.value) await updateDoc(doc(db, "stores", currentStoreDocId.value), data); };
                 
                 const addCast = async () => {
                     const n = prompt("名前");
@@ -417,8 +486,6 @@
                     }
                 };
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
-                const postAnnouncement = async () => { if(newAnnouncementText.value) { await updateStore({ announcements: arrayUnion({ text: newAnnouncementText.value, date: new Date().toISOString() }) }); showAnnouncementModal.value=false; newAnnouncementText.value=''; } };
-                const deleteAnnouncement = async (news) => { await updateStore({ announcements: arrayRemove(news) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
                 const deleteBackOption = async (opt) => { await updateStore({ backOptions: arrayRemove(opt) }); };
                 
@@ -428,7 +495,11 @@
                 const updateShift = async (s, st) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; await updateStore({ shifts: arrayUnion(newS) }); };
                 const reportAbsence = async () => { if(confirm("連絡しますか？")) { selectDate(new Date().toISOString().split('T')[0]); editingShift.type='欠勤'; await submitShift(); await sendMessageText('【自動】欠勤・遅刻連絡', true); } };
                 const sendMessage = () => sendMessageText(chatInput.value, !!activeCast.value);
-                const sendMessageText = async (txt, isCast) => { if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; };
+                const sendMessageText = async (txt, isCast) => { 
+                    if(!txt) return; const tid = isCast ? activeCast.value.id : viewingChatId.value; 
+                    const msg = { id:Date.now().toString(), text:txt, isSenderCast:isCast, timestamp:new Date().toISOString(), castId:tid, isRead:false }; 
+                    await updateStore({ messages: arrayUnion(msg) }); chatInput.value=''; 
+                };
                 const uploadIcon = async (e) => {
                     const file = e.target.files[0];
                     if(file && file.size < 100000) {
@@ -448,7 +519,9 @@
 
                 const openChat = (cid, n) => { 
                     viewingChatId.value=cid;
+                    markChatRead();
                 };
+                const closeChat = () => { viewingChatId.value = null; };
                 
                 const activeCast = computed(()=>storeData.value.casts.find(c=>c.id===currentCastId.value));
                 const pageTitle = computed(()=>activeCast.value?'Cast':'Manager');
@@ -502,7 +575,7 @@
                 const getLastMsg=(cid)=>{const m=storeData.value.messages.filter(x=>x.castId===cid);return m.length?m[m.length-1].text:'';};
                 const isMyMessage=(m)=>{if(activeCast.value)return m.isSenderCast;return !m.isSenderCast;};
 
-                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, getShift, submitShift, updateShift, reportAbsence, openChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, uploadIcon };
+                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, getShift, submitShift, updateShift, reportAbsence, openChat, closeChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, salaryInfo, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback, totalUnread, getUnreadCount, todayShifts, getStaffCount, uploadIcon, selectedNews, openNews, confirmNews, markChatRead };
             }
         }).mount('#app');
     </script>
