@@ -116,12 +116,29 @@
                 <div v-if="viewingChatId || (activeCast && currentTab==='messages')" class="flex flex-col gap-4 pb-4"><div v-if="currentMessages.length===0" class="text-center text-gray-400 text-sm mt-10">メッセージなし</div><div v-for="m in currentMessages" :key="m.id" class="flex flex-col" :class="isMyMessage(m)?'items-end':'items-start'"><div class="msg-bubble px-4 py-2 rounded-2xl text-sm" :class="isMyMessage(m)?(activeCast?'bg-pink-500 text-white':'bg-blue-500 text-white'):'bg-white dark:bg-gray-800 shadow-sm'">{{ m.text }}</div><span class="text-[10px] text-gray-400 mt-1">{{ formatTime(m.timestamp) }}</span></div></div>
 
                 <div v-if="currentTab==='settings'">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6 p-4"><div class="font-bold text-lg mb-1">{{ activeCast ? activeCast.name : storeData.storeName }}</div><div class="text-xs text-gray-400 mb-4">ID: {{ activeCast ? activeCast.code : storeData.storeDisplayId }}</div><div v-if="activeCast" class="p-4 border-t dark:border-gray-700 space-y-4"><div class="flex justify-between items-center"><span class="text-sm font-bold">給与概算を表示</span><button @click="toggleSalaryDisplay" class="w-10 h-5 bg-gray-300 rounded-full relative" :class="{'bg-green-500':activeCast.settings?.showSalary}"><div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-all" :class="{'left-6':activeCast.settings?.showSalary}"></div></button></div><div v-if="activeCast.settings?.showSalary"><label class="text-xs text-gray-500">基本時給</label><div class="flex items-center gap-2"><input type="number" v-model="activeCast.settings.hourlyRate" @change="saveCastSettings" class="p-2 border rounded w-24 bg-gray-50 dark:bg-gray-700 text-right"><span class="text-sm">円</span></div></div></div><button @click="logout" class="w-full text-left py-2 text-red-500 font-bold border-t dark:border-gray-700 pt-4 mt-2">ログアウト</button></div>
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-6 p-4">
+                        <div class="font-bold text-lg mb-1">{{ activeCast ? activeCast.name : storeData.storeName }}</div>
+                        <div class="text-xs text-gray-400 mb-4">ID: {{ activeCast ? activeCast.code : storeData.storeDisplayId }}</div>
+                        
+                        <div v-if="activeCast" class="p-4 border-t dark:border-gray-700 space-y-4">
+                            <div class="flex justify-between items-center"><span class="text-sm font-bold">給与概算を表示</span><button @click="toggleSalaryDisplay" class="w-10 h-5 bg-gray-300 rounded-full relative" :class="{'bg-green-500':activeCast.settings?.showSalary}"><div class="w-3 h-3 bg-white rounded-full absolute top-1 left-1 transition-all" :class="{'left-6':activeCast.settings?.showSalary}"></div></button></div>
+                            <div v-if="activeCast.settings?.showSalary"><label class="text-xs text-gray-500">基本時給</label><div class="flex items-center gap-2"><input type="number" v-model="activeCast.settings.hourlyRate" @change="saveCastSettings" class="p-2 border rounded w-24 bg-gray-50 dark:bg-gray-700 text-right"><span class="text-sm">円</span></div></div>
+                        </div>
+
+                        <div class="border-t dark:border-gray-700 pt-2 mt-2">
+                             <button @click="showHelpModal='usage'" class="w-full text-left py-3 text-sm flex justify-between items-center"><span>使い方ガイド</span><i class="fa-solid fa-chevron-right text-xs text-gray-400"></i></button>
+                             <button @click="showHelpModal='terms'" class="w-full text-left py-3 text-sm flex justify-between items-center"><span>利用規約</span><i class="fa-solid fa-chevron-right text-xs text-gray-400"></i></button>
+                             <button @click="openFeedback" class="w-full text-left py-3 text-sm flex justify-between items-center"><span>不具合報告・フィードバック</span><i class="fa-solid fa-envelope text-xs text-gray-400"></i></button>
+                        </div>
+
+                        <button @click="logout" class="w-full text-left py-2 text-red-500 font-bold border-t dark:border-gray-700 pt-4 mt-2">ログアウト</button>
+                    </div>
                 </div>
             </main>
 
             <div v-if="viewingChatId || (activeCast && currentTab==='messages')" class="bg-white dark:bg-gray-800 p-3 border-t dark:border-gray-700 safe-area-bottom flex gap-2"><input v-model="chatInput" placeholder="入力..." class="flex-1 bg-gray-100 dark:bg-gray-700 p-3 rounded-full dark:text-white"><button @click="sendMessage" :disabled="!chatInput" class="text-blue-500"><i class="fa-solid fa-paper-plane text-xl"></i></button></div>
-            <nav v-if="!viewingChatId && !(activeCast && currentTab==='messages')" class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 safe-area-bottom px-6 py-2 flex justify-between text-xs text-gray-400 z-20">
+            
+            <nav v-if="!viewingChatId" class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 safe-area-bottom px-6 py-2 flex justify-between text-xs text-gray-400 z-20">
                 <template v-if="!activeCast">
                     <button @click="currentTab='staff-home'" :class="{'text-blue-600':currentTab==='staff-home'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-house text-xl"></i>ホーム</button>
                     <button @click="currentTab='messages'" :class="{'text-blue-600':currentTab==='messages'}" class="flex flex-col items-center w-16 gap-1"><i class="fa-solid fa-message text-xl"></i>トーク</button>
@@ -139,7 +156,36 @@
         <div v-if="showAnnouncementModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl"><h3 class="font-bold mb-4">お知らせ投稿</h3><textarea v-model="newAnnouncementText" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg h-32 mb-4"></textarea><div class="flex gap-3"><button @click="showAnnouncementModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="postAnnouncement" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">投稿</button></div></div></div>
         <div v-if="showRegisterModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl"><h3 class="font-bold mb-4">新規店舗登録</h3><input v-model="newStoreName" placeholder="店舗名" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4"><input v-model="newStoreEmail" type="email" placeholder="メールアドレス" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4"><div class="flex gap-3"><button @click="showRegisterModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="registerStore" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">作成</button></div></div></div>
         <div v-if="showBackSettings" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl h-[70vh] flex flex-col"><h3 class="font-bold mb-4">バック設定</h3><div class="flex-1 overflow-y-auto space-y-2 mb-4"><div v-for="(opt, i) in storeData.backOptions" :key="i" class="flex justify-between items-center bg-gray-50 dark:bg-gray-700 p-2 rounded"><span>{{ opt.name }} (¥{{ opt.price }})</span><button @click="deleteBackOption(opt)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div></div><div class="border-t pt-4 space-y-2"><input v-model="newBackName" placeholder="項目名" class="w-full p-2 border rounded dark:bg-gray-700"><input v-model="newBackPrice" type="number" placeholder="単価" class="w-full p-2 border rounded dark:bg-gray-700"><button @click="addBackOption" class="w-full bg-blue-600 text-white py-2 rounded font-bold">追加</button><button @click="showBackSettings=false" class="w-full text-gray-500 mt-2">閉じる</button></div></div></div>
-        <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center"><h3 class="font-bold mb-2">{{ qrTargetName }}</h3><p class="text-xs text-gray-400 mb-4">以下のURLを共有してください</p><div class="bg-gray-100 p-3 rounded break-all text-xs font-mono select-all mb-4">{{ qrUrl }}</div><button @click="showQRModal=false" class="py-2 px-6 bg-blue-600 text-white rounded-lg">閉じる</button></div></div>
+        
+        <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
+                <h3 class="font-bold mb-2">{{ qrTargetName }}</h3>
+                <p class="text-xs text-gray-400 mb-4">このQRコードを読み取ってログイン</p>
+                <div class="flex justify-center mb-4">
+                    <img :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`" alt="QR Code" class="border rounded p-2 bg-white">
+                </div>
+                <button @click="showQRModal=false" class="py-2 px-6 bg-blue-600 text-white rounded-lg">閉じる</button>
+            </div>
+        </div>
+
+        <div v-if="showHelpModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl h-[70vh] flex flex-col">
+                <h3 class="font-bold mb-4">{{ showHelpModal==='terms'?'利用規約':'使い方ガイド' }}</h3>
+                <div class="flex-1 overflow-y-auto text-sm space-y-3 text-gray-600 dark:text-gray-300">
+                    <template v-if="showHelpModal==='terms'">
+                        <p>1. 本アプリはベータ版です。データの消失等について責任を負いません。</p>
+                        <p>2. 入力されたデータはFirebase(Google)に保存されます。</p>
+                        <p>3. アカウント情報は適切に管理してください。</p>
+                    </template>
+                    <template v-else>
+                        <p><strong>【店長】</strong><br>・キャストを追加してID/QRを渡してください。<br>・シフトの承認/却下ができます。</p>
+                        <p><strong>【キャスト】</strong><br>・カレンダーから希望シフトを提出します。<br>・「設定」で時給を登録すると給与目安が出ます。</p>
+                    </template>
+                </div>
+                <button @click="showHelpModal=null" class="mt-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-lg">閉じる</button>
+            </div>
+        </div>
+
     </div>
 
     <script type="module">
@@ -147,25 +193,12 @@
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c",
-            authDomain: "night-shift-pro.firebaseapp.com",
-            projectId: "night-shift-pro",
-            storageBucket: "night-shift-pro.firebasestorage.app",
-            messagingSenderId: "98250749733",
-            appId: "1:98250749733:web:167c5f6cc6a2e901160ccc",
-            measurementId: "G-7CFY2WW6TG"
-        };
-        const emailConfig = {
-            publicKey: "pBXsfa-38OMNK1E6b",
-            serviceId: "service_71f25g6",
-            templateId: "template_675u7wq"
-        };
+        const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
+        const emailConfig = { publicKey: "pBXsfa-38OMNK1E6b", serviceId: "service_71f25g6", templateId: "template_675u7wq" };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         
-        // Initialize EmailJS
         if(window.emailjs) emailjs.init(emailConfig.publicKey);
 
         const { createApp, ref, computed, reactive, onMounted, nextTick } = Vue;
@@ -190,6 +223,7 @@
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
                 const newBackName=ref(''); const newBackPrice=ref('');
                 const showQRModal=ref(false); const qrUrl=ref(''); const qrTargetName=ref('');
+                const showHelpModal=ref(null); // 'terms' or 'usage'
                 const isFirstRun = ref(false);
 
                 let unsubscribe = null;
@@ -320,8 +354,9 @@
                 const toggleSalaryDisplay=async()=>{ const newCast = JSON.parse(JSON.stringify(activeCast.value)); if(!newCast.settings) newCast.settings={hourlyRate:2000, showSalary:true}; newCast.settings.showSalary = !newCast.settings.showSalary; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); };
                 const saveCastSettings=async()=>{ const newCast = JSON.parse(JSON.stringify(activeCast.value)); await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); };
                 const showQRCode=(c)=>{ qrTargetName.value=c.name; qrUrl.value=`${window.location.origin}${window.location.pathname}?store=${storeData.value.storeDisplayId}&code=${c.code}`; showQRModal.value=true; };
+                const openFeedback = () => { window.location.href = `mailto:support@example.com?subject=NightShiftPro不具合報告&body=店舗ID:${storeData.value.storeDisplayId}`; };
 
-                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, getShift, submitShift, updateShift, reportAbsence, openChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, calculateMonthlySalary, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode };
+                return { isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId, staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput, storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages, registerStore, loginStaff, loginCast, logout, showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement, showRegisterModal, showBackSettings, newBackName, newBackPrice, addBackOption, deleteBackOption, selectDate, getShift, submitShift, updateShift, reportAbsence, openChat, sendMessage, isMyMessage, getLastMsg, formatTime, formatDate, isSameDay, getShiftColor, calculateMonthlySalary, toggleSalaryDisplay, saveCastSettings, addCast, deleteCast, showQRModal, qrUrl, qrTargetName, showQRCode, showHelpModal, openFeedback };
             }
         }).mount('#app');
     </script>
