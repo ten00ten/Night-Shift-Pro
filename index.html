@@ -405,7 +405,7 @@
                         await updateStore({ announcements: arrayUnion(news) }); 
                         showAnnouncementModal.value=false; 
                         newAnnouncementText.value='';
-                        alert("お知らせを投稿しました！"); // ★ 投稿完了アラート追加
+                        alert("お知らせを投稿しました！"); 
                     } 
                 };
                 const deleteAnnouncement = async (news) => { await updateStore({ announcements: arrayRemove(news) }); };
@@ -435,6 +435,15 @@
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
                 const deleteBackOption = async (opt) => { await updateStore({ backOptions: arrayRemove(opt) }); };
+                
+                const calendarDays = computed(() => { const year = currentMonth.value.getFullYear(); const month = currentMonth.value.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const days = []; for(let i=0; i<firstDay.getDay(); i++) days.push({ dateStr: '', isCurrentMonth: false }); for(let i=1; i<=lastDay.getDate(); i++) { const d = new Date(year, month, i); const str = d.toISOString().split('T')[0]; days.push({ dateStr: str, isCurrentMonth: true }); } return days; });
+                const changeMonth = (n) => { const d = new Date(currentMonth.value); d.setMonth(d.getMonth() + n); currentMonth.value = d; };
+                const goToToday = () => { currentMonth.value = new Date(); selectedDate.value = new Date().toISOString().split('T')[0]; };
+                const currentMonthDisplay = computed(() => `${currentMonth.value.getFullYear()}年 ${currentMonth.value.getMonth() + 1}月`);
+                const todayStr = computed(() => new Date().toISOString().split('T')[0]);
+                const selectDate=(d)=>{ if(!d) return; selectedDate.value=d; const s=getMyShift(d); editingShift.type=s?s.type:'出勤'; editingShift.startTime=s?s.startTime:'20:00'; editingShift.endTime=s?s.endTime:'25:00'; editingShift.note=s?s.note:''; editingShift.backs = s && s.backs ? {...s.backs} : {}; };
+                const getMyShift=(d)=>storeData.value.shifts.find(s=>s.date===d && s.castId===currentCastId.value);
+                const getCastIcon = (cid) => { const c = storeData.value.casts.find(x=>x.id===cid); return c ? c.icon : null; };
                 const submitShift = async () => { const s = getMyShift(selectedDate.value); if(s) await updateStore({ shifts: arrayRemove(s) }); const newShift = { id: Date.now().toString(), date: selectedDate.value, castId: currentCastId.value, castName: activeCast.value.name, status: '承認待ち', ...editingShift, backs:{...editingShift.backs} }; await updateStore({ shifts: arrayUnion(newShift) }); alert("保存しました"); };
                 const updateShift = async (s, st, confirmed = false) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; if(confirmed) newS.attendanceConfirmed = true; await updateStore({ shifts: arrayUnion(newS) }); };
                 const reportAbsence = async () => { 
