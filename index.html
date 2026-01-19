@@ -313,6 +313,8 @@
         import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c", authDomain: "night-shift-pro.firebaseapp.com", projectId: "night-shift-pro", storageBucket: "night-shift-pro.firebasestorage.app", messagingSenderId: "98250749733", appId: "1:98250749733:web:167c5f6cc6a2e901160ccc", measurementId: "G-7CFY2WW6TG" };
+        
+        // ★★★ メールID設定 (ここはそのままでOK) ★★★
         const emailConfig = { 
             publicKey: "pBXsfa-38OMNK1E6b", 
             serviceId: "service_71f25g6", 
@@ -341,7 +343,7 @@
                 const currentStoreDocId = ref(null);
                 const currentCastId = ref(null);
                 const currentMonth = ref(new Date());
-                const selectedDate = ref(new Date().toISOString().split('T')[0]);
+                const selectedDate = ref(new Date().toISOString().split('T')[0]); // 初期化用（後で上書き）
                 const editingShift = reactive({type:'出勤',startTime:'20:00',endTime:'25:00',note:'', backs:{}});
                 const showAnnouncementModal=ref(false); const newAnnouncementText=ref('');
                 const showRegisterModal=ref(false); const showBackSettings=ref(false);
@@ -349,6 +351,19 @@
                 const showQRModal=ref(false); const qrUrl=ref(''); const qrTargetName=ref('');
                 const showHelpModal=ref(null); const isFirstRun = ref(false);
                 const selectedNews = ref(null);
+
+                // 日付操作のヘルパー (UTCズレ防止)
+                const formatLocal = (d) => {
+                    const year = d.getFullYear();
+                    const month = ('0' + (d.getMonth() + 1)).slice(-2);
+                    const day = ('0' + d.getDate()).slice(-2);
+                    return `${year}-${month}-${day}`;
+                };
+                
+                // 初期化時に正しい日付をセット
+                onMounted(() => {
+                    selectedDate.value = formatLocal(new Date());
+                });
 
                 const generateRandomId = (prefix, length) => { const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = ''; for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length)); return prefix + result; };
                 const generateRandomPass = () => Math.random().toString(36).slice(-8);
@@ -421,7 +436,10 @@
                     const id = generateRandomId('ST-', 8); const adm = generateRandomId('ADM-', 8); const pass = generateRandomPass();
                     try {
                         await addDoc(collection(db, "stores"), { storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: pass, casts: [], shifts: [], messages: [], announcements: [], backOptions: [], storeEmail: newStoreEmail.value });
-                        if(window.emailjs) { const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass }; await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params); }
+                        if(window.emailjs) { 
+                            const params = { to_name: newStoreName.value, to_email: newStoreEmail.value, store_id: id, admin_id: adm, password: pass }; 
+                            await emailjs.send(emailConfig.serviceId, emailConfig.templateId, params); 
+                        }
                         alert(`登録完了！メールを送信しました。\n店舗ID: ${id}\n管理者ID: ${adm}\nPass: ${pass}`);
                         newStoreName.value = ''; newStoreEmail.value = ''; showRegisterModal.value = false; checkFirstRun();
                     } catch(e) { alert("エラー: " + e.message); }
@@ -435,24 +453,32 @@
                 const deleteCast = async (cast) => { if(confirm("削除しますか？")) await updateStore({ casts: arrayRemove(cast) }); };
                 const addBackOption = async () => { if(newBackName.value && newBackPrice.value) { await updateStore({ backOptions: arrayUnion({ id:Date.now().toString(), name:newBackName.value, price:parseInt(newBackPrice.value) }) }); newBackName.value=''; newBackPrice.value=''; }};
                 const deleteBackOption = async (opt) => { await updateStore({ backOptions: arrayRemove(opt) }); };
-                
-                const calendarDays = computed(() => { const year = currentMonth.value.getFullYear(); const month = currentMonth.value.getMonth(); const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0); const days = []; for(let i=0; i<firstDay.getDay(); i++) days.push({ dateStr: '', isCurrentMonth: false }); for(let i=1; i<=lastDay.getDate(); i++) { const d = new Date(year, month, i); const str = d.toISOString().split('T')[0]; days.push({ dateStr: str, isCurrentMonth: true }); } return days; });
-                const changeMonth = (n) => { const d = new Date(currentMonth.value); d.setMonth(d.getMonth() + n); currentMonth.value = d; };
-                const goToToday = () => { currentMonth.value = new Date(); selectedDate.value = new Date().toISOString().split('T')[0]; };
-                const currentMonthDisplay = computed(() => `${currentMonth.value.getFullYear()}年 ${currentMonth.value.getMonth() + 1}月`);
-                const todayStr = computed(() => new Date().toISOString().split('T')[0]);
-                const selectDate=(d)=>{ if(!d) return; selectedDate.value=d; const s=getMyShift(d); editingShift.type=s?s.type:'出勤'; editingShift.startTime=s?s.startTime:'20:00'; editingShift.endTime=s?s.endTime:'25:00'; editingShift.note=s?s.note:''; editingShift.backs = s && s.backs ? {...s.backs} : {}; };
-                const getMyShift=(d)=>storeData.value.shifts.find(s=>s.date===d && s.castId===currentCastId.value);
-                const getCastIcon = (cid) => { const c = storeData.value.casts.find(x=>x.id===cid); return c ? c.icon : null; };
                 const submitShift = async () => { const s = getMyShift(selectedDate.value); if(s) await updateStore({ shifts: arrayRemove(s) }); const newShift = { id: Date.now().toString(), date: selectedDate.value, castId: currentCastId.value, castName: activeCast.value.name, status: '承認待ち', ...editingShift, backs:{...editingShift.backs} }; await updateStore({ shifts: arrayUnion(newShift) }); alert("保存しました"); };
                 const updateShift = async (s, st, confirmed = false) => { await updateStore({ shifts: arrayRemove(s) }); const newS = {...s, status: st}; if(confirmed) newS.attendanceConfirmed = true; await updateStore({ shifts: arrayUnion(newS) }); };
                 const reportAbsence = async () => { 
                     if(confirm("店長に欠勤・遅刻の連絡をしますか？\n（メール通知が送られます）")) { 
-                        selectDate(new Date().toISOString().split('T')[0]); editingShift.type='欠勤'; await submitShift(); 
+                        // 今日 (YYYY-MM-DD)
+                        const today = formatLocal(new Date());
+                        selectDate(today); 
+                        editingShift.type='欠勤'; 
+                        await submitShift(); 
+                        
                         await sendMessageText('【自動連絡】欠勤・遅刻の連絡をしました', true);
+                        
+                        // メール通知 (修正版)
                         if(storeData.value.storeEmail && window.emailjs) {
-                            const params = { to_email: storeData.value.storeEmail, subject: `【欠勤連絡】${activeCast.value.name}さんから連絡があります`, message: `${activeCast.value.name}さんが本日の欠勤・遅刻を報告しました。\nアプリを確認してください。` };
-                            try { await emailjs.send(emailConfig.serviceId, emailConfig.notificationTemplateId, params); alert("店長へメール通知を送信しました。"); } catch(e) {}
+                            const params = { 
+                                to_email: storeData.value.storeEmail, 
+                                subject: `【欠勤連絡】${activeCast.value.name}さんから連絡があります`, 
+                                message: `${activeCast.value.name}さんが本日の欠勤・遅刻を報告しました。\nアプリを確認してください。`,
+                                // テンプレートのエラー回避用ダミーデータ
+                                name: activeCast.value.name, // From Name用
+                                email: "noreply@nightshift.app" // Reply To用
+                            };
+                            try { 
+                                await emailjs.send(emailConfig.serviceId, emailConfig.notificationTemplateId, params); 
+                                alert("店長へメール通知を送信しました。"); 
+                            } catch(e) { console.error(e); alert("メール送信失敗: " + JSON.stringify(e)); }
                         }
                     } 
                 };
@@ -479,11 +505,11 @@
                 const currentMessages = computed(()=>{ const tid = activeCast.value ? activeCast.value.id : viewingChatId.value; return storeData.value.messages.filter(m=>m.castId===tid).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp)); });
                 const totalUnread = computed(()=> { if(!activeCast.value) return 0; return storeData.value.messages.filter(m=>m.castId===activeCast.value.id && !m.isSenderCast && !m.isRead).length; });
                 const getUnreadCount = (cid) => storeData.value.messages.filter(m=>m.castId===cid && m.isSenderCast && !m.isRead).length;
-                const todayShifts = computed(() => { const today = new Date().toISOString().split('T')[0]; return storeData.value.shifts.filter(s => s.date === today && s.type === '出勤' && s.status === '承認済み'); });
+                const todayShifts = computed(() => { const today = formatLocal(new Date()); return storeData.value.shifts.filter(s => s.date === today && s.type === '出勤' && s.status === '承認済み'); });
                 const getStaffCount = (date) => storeData.value.shifts.filter(s => s.date === date && s.type === '出勤' && s.status === '承認済み').length;
                 const getDailyShifts = (date) => storeData.value.shifts.filter(s => s.date === date && s.type === '出勤' && s.status === '承認済み');
                 const sortedAnnouncements = computed(() => { if(!storeData.value.announcements) return []; return [...storeData.value.announcements].sort((a,b) => new Date(b.date) - new Date(a.date)); });
-                const todaysMyShift = computed(() => { if(!activeCast.value) return null; const today = new Date().toISOString().split('T')[0]; return storeData.value.shifts.find(s => s.date === today && s.castId === activeCast.value.id && s.type === '出勤' && s.status === '承認済み'); });
+                const todaysMyShift = computed(() => { if(!activeCast.value) return null; const today = formatLocal(new Date()); return storeData.value.shifts.find(s => s.date === today && s.castId === activeCast.value.id && s.type === '出勤' && s.status === '承認済み'); });
                 const getMyMonthlyShifts = computed(() => { if(!activeCast.value) return []; const m = currentMonth.value.getMonth(); const y = currentMonth.value.getFullYear(); return storeData.value.shifts.filter(s => { const d = new Date(s.date); return d.getMonth() === m && d.getFullYear() === y && s.castId === activeCast.value.id && s.type === '出勤'; }).sort((a,b)=>new Date(a.date)-new Date(b.date)); });
 
                 const next7Days = computed(() => {
@@ -491,10 +517,33 @@
                     for(let i=0; i<7; i++) {
                         const d = new Date();
                         d.setDate(d.getDate() + i);
-                        days.push({ dateStr: d.toISOString().split('T')[0] });
+                        days.push({ dateStr: formatLocal(d) });
                     }
                     return days;
                 });
+
+                const calendarDays = computed(() => { 
+                    const year = currentMonth.value.getFullYear(); 
+                    const month = currentMonth.value.getMonth(); 
+                    const firstDay = new Date(year, month, 1); 
+                    const lastDay = new Date(year, month + 1, 0); 
+                    const days = []; 
+                    for(let i=0; i<firstDay.getDay(); i++) days.push({ dateStr: '', isCurrentMonth: false }); 
+                    for(let i=1; i<=lastDay.getDate(); i++) { 
+                        const d = new Date(year, month, i); 
+                        const str = formatLocal(d); // ここで修正版の日付フォーマッターを使用
+                        days.push({ dateStr: str, isCurrentMonth: true }); 
+                    } 
+                    return days; 
+                });
+
+                const changeMonth = (n) => { const d = new Date(currentMonth.value); d.setMonth(d.getMonth() + n); currentMonth.value = d; };
+                const goToToday = () => { currentMonth.value = new Date(); selectedDate.value = formatLocal(new Date()); };
+                const currentMonthDisplay = computed(() => `${currentMonth.value.getFullYear()}年 ${currentMonth.value.getMonth() + 1}月`);
+                const todayStr = computed(() => formatLocal(new Date()));
+                const selectDate=(d)=>{ if(!d) return; selectedDate.value=d; const s=getMyShift(d); editingShift.type=s?s.type:'出勤'; editingShift.startTime=s?s.startTime:'20:00'; editingShift.endTime=s?s.endTime:'25:00'; editingShift.note=s?s.note:''; editingShift.backs = s && s.backs ? {...s.backs} : {}; };
+                const getMyShift=(d)=>storeData.value.shifts.find(s=>s.date===d && s.castId===currentCastId.value);
+                const getCastIcon = (cid) => { const c = storeData.value.casts.find(x=>x.id===cid); return c ? c.icon : null; };
 
                 const salaryInfo = computed(() => { if(!activeCast.value) return {confirmed:0, pending:0}; const thisMonth = new Date().getMonth(); const myShifts = storeData.value.shifts.filter(s => s.castId === currentCastId.value && new Date(s.date).getMonth() === thisMonth && s.type === '出勤'); const hourly = activeCast.value.settings?.hourlyRate || 0; const backOpts = storeData.value.backOptions || []; const calc = (shifts) => { let total = 0; shifts.forEach(s => { const start = parseInt(s.startTime.split(':')[0]) + parseInt(s.startTime.split(':')[1])/60; const end = parseInt(s.endTime.split(':')[0]) + parseInt(s.endTime.split(':')[1])/60; total += (end - start) * hourly; if(s.backs) { Object.keys(s.backs).forEach(oid=>{const c=parseInt(s.backs[oid]); const o=backOpts.find(x=>x.id===oid); if(o) total+=c*o.price;}); } }); return Math.floor(total); }; return { confirmed: calc(myShifts.filter(s => s.status === '承認済み')), pending: calc(myShifts.filter(s => s.status === '承認待ち')) }; });
                 const toggleSalaryDisplay=async()=>{ const newCast = JSON.parse(JSON.stringify(activeCast.value)); if(!newCast.settings) newCast.settings={hourlyRate:2000, showSalary:true}; newCast.settings.showSalary = !newCast.settings.showSalary; await updateStore({ casts: arrayRemove(activeCast.value) }); await updateStore({ casts: arrayUnion(newCast) }); };
