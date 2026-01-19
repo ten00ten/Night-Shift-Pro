@@ -16,7 +16,7 @@
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // ▼▼▼ あなたのFirebase設定 ▼▼▼
+        // Firebase設定
         const firebaseConfig = {
             apiKey: "AIzaSyD932E1eO3VTLQR49mibJFm-jks2xtVf0c",
             authDomain: "night-shift-pro.firebaseapp.com",
@@ -26,18 +26,30 @@
             appId: "1:98250749733:web:167c5f6cc6a2e901160ccc",
             measurementId: "G-7CFY2WW6TG"
         };
-        // ▲▲▲ 設定ここまで ▲▲▲
 
-        // Firebase初期化
         const app = initializeApp(firebaseConfig);
         const analytics = getAnalytics(app);
         const db = getFirestore(app);
 
-        // Vueから使えるようにグローバルに公開
+        // Vueから使えるように公開
         window.db = db;
         window.fb = { collection, addDoc, doc, getDoc, updateDoc, onSnapshot, arrayUnion, arrayRemove, getDocs, query, where };
-        
-        console.log("Firebase Connected:", app.name);
+    </script>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+        // ▼▼▼ EmailJS設定 (頂いたIDをセット済み) ▼▼▼
+        const emailConfig = {
+            publicKey: "pBXsfa-38OMNK1E6b",
+            serviceId: "service_71f25g6",
+            templateId: "template_675u7wq"
+        };
+        // ▲▲▲ 設定ここまで ▲▲▲
+
+        (function(){
+            emailjs.init(emailConfig.publicKey);
+        })();
+        window.emailConfig = emailConfig;
     </script>
 
     <script>tailwind.config = { darkMode: 'media' }</script>
@@ -46,7 +58,6 @@
         ::-webkit-scrollbar { display: none; }
         .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
         .msg-bubble { max-width: 75%; word-wrap: break-word; }
-        /* 広告スペース */
         .ad-banner { width: 100%; height: 50px; background: #f0f0f0; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #aaa; margin-bottom: 10px; }
     </style>
 </head>
@@ -56,7 +67,7 @@
         
         <div v-if="isLoading" class="fixed inset-0 z-[9999] bg-white dark:bg-gray-900 flex flex-col items-center justify-center gap-4">
             <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-            <p class="text-xs text-gray-400">Cloud Connecting...</p>
+            <p class="text-xs text-gray-400">Loading...</p>
         </div>
 
         <div v-if="!isLoading && isFirstRun" class="fixed inset-0 z-50 bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center p-6">
@@ -65,7 +76,8 @@
             <p class="text-gray-500 dark:text-gray-400 text-center mb-8 text-sm">クラウド接続完了。<br>最初の店舗アカウントを作成します。</p>
             <div class="w-full max-w-sm space-y-4 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
                 <input v-model="newStoreName" placeholder="店舗名" class="w-full p-4 bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 rounded-xl">
-                <button @click="registerStore" :disabled="!newStoreName" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50">アカウント作成</button>
+                <input v-model="newStoreEmail" type="email" placeholder="メールアドレス (通知先)" class="w-full p-4 bg-gray-50 dark:bg-gray-700 border dark:border-gray-600 rounded-xl">
+                <button @click="registerStore" :disabled="!newStoreName || !newStoreEmail" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50">アカウント作成</button>
             </div>
         </div>
 
@@ -76,7 +88,7 @@
                 <div class="bg-gray-200 dark:bg-gray-800 px-4 py-1 rounded-full text-sm font-bold text-gray-600 dark:text-gray-300">{{ isStaffLoginMode ? '管理者' : 'キャスト' }}ログイン</div>
             </div>
             
-            <div class="px-8 mt-4"><div class="ad-banner">広告スペース (審査通過後に表示)</div></div>
+            <div class="px-8 mt-4"><div class="ad-banner">広告スペース</div></div>
 
             <div class="px-8 mt-6 space-y-6">
                 <div v-if="isStaffLoginMode" class="space-y-4">
@@ -105,6 +117,7 @@
             </header>
 
             <main class="flex-1 overflow-y-auto pb-24 px-4 py-4" ref="mainScroll">
+                
                 <div v-if="currentTab==='staff-home' && !viewingChatId">
                     <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm mb-6">
                         <div class="flex justify-between items-center mb-3">
@@ -152,7 +165,6 @@
                     <button @click="reportAbsence" class="w-full mb-6 p-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-200"><i class="fa-solid fa-triangle-exclamation"></i> 欠勤連絡</button>
                     <div v-if="activeCast.settings?.showSalary" class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-xl p-4 text-white shadow-lg mb-4">
                         <div class="flex justify-between items-end"><div class="text-xs opacity-90">見込み給与</div><div class="text-2xl font-bold">¥{{ calculateMonthlySalary().toLocaleString() }}</div></div>
-                        <div class="text-[10px] opacity-70 mt-1 text-right">※目安です</div>
                     </div>
 
                     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-4 mb-4">
@@ -237,13 +249,16 @@
                 <div class="flex gap-3"><button @click="showAnnouncementModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="postAnnouncement" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">投稿</button></div>
             </div>
         </div>
+
         <div v-if="showRegisterModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl">
                 <h3 class="font-bold mb-4">新規店舗登録</h3>
                 <input v-model="newStoreName" placeholder="店舗名" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4">
+                <input v-model="newStoreEmail" type="email" placeholder="メールアドレス" class="w-full p-3 bg-gray-50 dark:bg-gray-700 border rounded-lg mb-4">
                 <div class="flex gap-3"><button @click="showRegisterModal=false" class="flex-1 py-3 text-gray-500">キャンセル</button><button @click="registerStore" class="flex-1 bg-blue-600 text-white rounded-lg font-bold">作成</button></div>
             </div>
         </div>
+
         <div v-if="showBackSettings" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl h-[70vh] flex flex-col">
                 <h3 class="font-bold mb-4">バック設定</h3>
@@ -256,6 +271,7 @@
                 </div>
             </div>
         </div>
+
         <div v-if="showQRModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div class="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center">
                 <h3 class="font-bold mb-2">{{ qrTargetName }}</h3>
@@ -282,8 +298,8 @@
                 
                 const staffIdInput=ref(''); const staffPassInput=ref('');
                 const storeIdInput=ref(''); const castCodeInput=ref('');
-                const newStoreName=ref(''); const chatInput=ref('');
-                const mainScroll=ref(null);
+                const newStoreName=ref(''); const newStoreEmail=ref(''); // メール変数追加
+                const chatInput=ref(''); const mainScroll=ref(null);
                 const currentStoreDocId = ref(null);
                 const currentCastId = ref(null);
 
@@ -303,7 +319,6 @@
                     unsubscribe = onSnapshot(doc(db, "stores", docId), (d) => {
                         if(d.exists()) {
                             storeData.value = d.data();
-                            // バック設定がない場合の初期化
                             if(!storeData.value.backOptions) storeData.value.backOptions = [];
                         }
                     });
@@ -317,14 +332,12 @@
                 };
 
                 onMounted(async () => {
-                    // Check URL Params
                     const params = new URLSearchParams(window.location.search);
                     const sId = params.get('store');
                     const cCode = params.get('code');
                     
                     if(sId && cCode) {
                         isLoading.value = true;
-                        // Find Store
                         const q = query(collection(db, "stores"), where("storeDisplayId", "==", sId));
                         const snap = await getDocs(q);
                         if(!snap.empty) {
@@ -346,7 +359,7 @@
 
                 // Actions
                 const registerStore = async () => {
-                    if(!newStoreName.value) return;
+                    if(!newStoreName.value || !newStoreEmail.value) { alert("店舗名とメールアドレスを入力してください"); return; }
                     isLoading.value = true;
                     const id = 'ST-'+Math.floor(1000+Math.random()*9000);
                     const adm = 'ADM-'+Math.floor(1000+Math.random()*9000);
@@ -355,16 +368,32 @@
                             storeName: newStoreName.value, storeDisplayId: id, staffLoginId: adm, staffPassword: 'pass',
                             casts: [], shifts: [], messages: [], announcements: [], backOptions: []
                         });
-                        alert(`完了！\n店舗ID: ${id}\n管理者ID: ${adm}\nPass: pass`);
-                        newStoreName.value = ''; showRegisterModal.value = false;
+
+                        // ▼▼▼ EmailJS 送信ロジック ▼▼▼
+                        if(window.emailConfig && window.emailjs) {
+                            const params = {
+                                to_name: newStoreName.value,
+                                to_email: newStoreEmail.value,
+                                store_id: id,
+                                admin_id: adm,
+                                password: 'pass'
+                            };
+                            await emailjs.send(window.emailConfig.serviceId, window.emailConfig.templateId, params);
+                        }
+                        // ▲▲▲ ▲▲▲
+
+                        alert(`完了！登録メールを ${newStoreEmail.value} に送信しました。\n店舗ID: ${id}\n管理者ID: ${adm}`);
+                        newStoreName.value = ''; newStoreEmail.value = ''; showRegisterModal.value = false;
                         checkFirstRun();
-                    } catch(e) { alert("Error: " + e.message); }
+                    } catch(e) { 
+                        alert("登録は完了しましたが、メール送信に失敗したかエラーが発生しました。\nID: " + id);
+                        console.error(e);
+                    }
                     isLoading.value = false;
                 };
 
                 const loginStaff = async () => {
                     isLoading.value = true;
-                    // 簡易検索 (本来はIDで直接引くべきだが、デモなのでQuery)
                     const q = query(collection(db, "stores"), where("staffLoginId", "==", staffIdInput.value), where("staffPassword", "==", staffPassInput.value));
                     const snap = await getDocs(q);
                     if(!snap.empty) {
@@ -451,7 +480,6 @@
                     alert("保存しました");
                 };
                 const updateShift = async (s, st) => {
-                    // Update is tricky in array. Remove then Add.
                     await updateStore({ shifts: arrayRemove(s) });
                     const newS = {...s, status: st};
                     await updateStore({ shifts: arrayUnion(newS) });
@@ -511,7 +539,6 @@
                     return Math.floor(total);
                 };
                 const toggleSalaryDisplay=async()=>{
-                    // Array update is hard for nested objects, so we replace the whole cast object
                     const newCast = JSON.parse(JSON.stringify(activeCast.value));
                     if(!newCast.settings) newCast.settings={hourlyRate:2000, showSalary:true};
                     newCast.settings.showSalary = !newCast.settings.showSalary;
@@ -532,7 +559,7 @@
 
                 return {
                     isLoading, isFirstRun, isLoggedIn, isStaffLoginMode, currentTab, viewingChatId,
-                    staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, chatInput,
+                    staffIdInput, staffPassInput, storeIdInput, castCodeInput, newStoreName, newStoreEmail, chatInput,
                     storeData, activeCast, pageTitle, pendingShifts, calendarDays, selectedDate, editingShift, currentMessages,
                     registerStore, loginStaff, loginCast, logout,
                     showAnnouncementModal, newAnnouncementText, postAnnouncement, deleteAnnouncement,
